@@ -1,0 +1,253 @@
+{
+  "entities": {
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Represents a staff member or invigilator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Staff code (e.g., AMOP)" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "description": "Staff email for account linking" },
+        "roles": { 
+          "type": "array", 
+          "items": { "type": "string", "enum": ["WEBMASTER", "ADMIN", "TEACHER", "OPERATIONAL_MANAGER"] } 
+        },
+        "activeRole": { "type": "string", "enum": ["WEBMASTER", "ADMIN", "TEACHER", "OPERATIONAL_MANAGER"] },
+        "totalHours": { "type": "number" },
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "timetable": {
+          "type": "object",
+          "properties": {
+            "cycle1": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+            "cycle2": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } }
+          }
+        },
+        "breakDutyDates": {
+          "type": "array",
+          "items": { "type": "string", "format": "date" },
+          "description": "Dates when the teacher is on playground/break duty"
+        },
+        "afternoonDutyDates": {
+          "type": "array",
+          "items": { "type": "string", "format": "date" },
+          "description": "Dates when the teacher is on afternoon duty (blocks afternoon invigilation)"
+        },
+        "workloadPercentage": {
+          "type": "number",
+          "description": "The percentage of full-time invigilation workload (e.g. 100 or 85)"
+        }
+      },
+      "required": ["id", "firstName", "lastName", "roles", "activeRole", "uid"]
+    },
+    "ExamSession": {
+      "title": "ExamSession",
+      "description": "An exam session that requires invigilation.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "subject": { "type": "string" },
+        "paper": { "type": "string" },
+        "grade": { "type": "integer" },
+        "location": { "type": "string" },
+        "startTime": { "type": "string" },
+        "durationMinutes": { "type": "integer" },
+        "status": { "type": "string", "enum": ["UPCOMING", "IN_PROGRESS", "COMPLETED"] }
+      },
+      "required": ["date", "subject", "paper", "grade", "location", "startTime", "durationMinutes", "status"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Links a teacher to an exam session.",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "type": { "type": "string", "enum": ["PRIMARY", "STANDBY", "REPLACEMENT"] },
+        "startTimeOffset": { "type": "integer" }
+      },
+      "required": ["sessionId", "teacherId", "type", "startTimeOffset"]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Information about a teacher's leave.",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "dateEnd": { "type": "string", "format": "date" },
+        "type": { "type": "string", "enum": ["Sick Leave", "Arrangement", "Special leave"] },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "DENIED"] },
+        "isFullDay": { "type": "boolean" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["teacherId", "date", "type", "status", "isFullDay"]
+    },
+    "TimetableEntry": {
+      "title": "TimetableEntry",
+      "description": "Information about an exam session on the timetable.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "grade": { "type": "integer" },
+        "session": { "type": "string", "enum": ["MORNING", "AFTERNOON"] },
+        "subject": { "type": "string" },
+        "paperType": { "type": "string", "enum": ["Normal", "P1", "P2", "Prac"] },
+        "durationMinutes": { "type": "integer" },
+        "totalBoys": { "type": "integer" },
+        "totalGirls": { "type": "integer" },
+        "totalStudents": { "type": "integer" },
+        "sessionMode": { "type": "string", "enum": ["SIMULTANEOUS", "SEQUENTIAL"] }
+      },
+      "required": ["date", "grade", "session", "subject", "paperType"]
+    },
+    "Venue": {
+      "title": "Venue",
+      "description": "Represents an examination venue.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["Normal", "Lab", "Hall"] },
+        "capacity": { "type": "integer" }
+      },
+      "required": ["id", "name", "type", "capacity"]
+    },
+    "MarkingExtension": {
+      "title": "MarkingExtension",
+      "description": "Request for additional marking time.",
+      "type": "object",
+      "properties": {
+        "entryId": { "type": "string" },
+        "subject": { "type": "string" },
+        "grade": { "type": "integer" },
+        "requestDate": { "type": "string", "format": "date-time" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "DENIED"] },
+        "mitigationComments": { "type": "string" },
+        "additionalGreenDays": { "type": "integer" },
+        "requestedBy": { "type": "string" },
+        "resolvedBy": { "type": "string" }
+      },
+      "required": ["entryId", "subject", "grade", "requestDate", "reason", "status", "additionalGreenDays", "requestedBy"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "A master record of a school subject.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["code", "name"]
+    },
+    "TimetableLock": {
+      "title": "TimetableLock",
+      "description": "Lock status for a specific timetable date.",
+      "type": "object",
+      "properties": {
+        "locked": { "type": "boolean" }
+      },
+      "required": ["locked"]
+    },
+    "DayPeriodConfig": {
+      "title": "DayPeriodConfig",
+      "description": "Custom period configurations for specific days or dates.",
+      "type": "object",
+      "properties": {
+        "periods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "label": { "type": "string" },
+              "start": { "type": "string" },
+              "end": { "type": "string" },
+              "break": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "required": ["periods"]
+    },
+    "HelpRequest": {
+      "title": "HelpRequest",
+      "description": "A notification sent by an invigilator to a standby teacher.",
+      "type": "object",
+      "properties": {
+        "venueId": { "type": "string" },
+        "venueName": { "type": "string" },
+        "invigilatorId": { "type": "string" },
+        "invigilatorName": { "type": "string" },
+        "standbyId": { "type": "string" },
+        "option": { "type": "string", "enum": ["Question Paper Required", "Folio required", "Toiletpaper required", "Bathroom Break", "SOS"] },
+        "quantity": { "type": "integer" },
+        "subject": { "type": "string" },
+        "grade": { "type": "integer" },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["venueId", "venueName", "invigilatorId", "invigilatorName", "standbyId", "option", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "Teacher",
+      "description": "User profile documents."
+    },
+    "/sessions/{sessionId}": {
+      "schema": "ExamSession",
+      "description": "Exam session definitions."
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "Teacher assignments for sessions."
+    },
+    "/leaveRequests/{requestId}": {
+      "schema": "LeaveRequest",
+      "description": "Teacher leave requests."
+    },
+    "/timetableEntries/{entryId}": {
+      "schema": "TimetableEntry",
+      "description": "Exam timetable sessions."
+    },
+    "/venues/{venueId}": {
+      "schema": "Venue",
+      "description": "Examination venues."
+    },
+    "/markingExtensions/{extensionId}": {
+      "schema": "MarkingExtension",
+      "description": "Marking extension requests."
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Master list of school subjects."
+    },
+    "/timetableLocks/{date}": {
+      "schema": "TimetableLock",
+      "description": "Lock status for specific exam timetable days."
+    },
+    "/dayPeriodConfigs/{configId}": {
+      "schema": "DayPeriodConfig",
+      "description": "Custom period configurations for specific days or dates."
+    },
+    "/helpRequests/{requestId}": {
+      "schema": "HelpRequest",
+      "description": "Real-time help requests from invigilators."
+    }
+  }
+}

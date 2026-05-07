@@ -1,0 +1,1 @@
+                                        const firstEmpty = relevantPIdxs.find(p => !entry.invigilatorAssignments?.[p]);
