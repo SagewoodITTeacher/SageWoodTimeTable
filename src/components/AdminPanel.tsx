@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Teacher,
-  ExamSession,
   Assignment,
   Subject,
   TeacherTimetable,
@@ -10,9 +9,14 @@ import {
   Venue,
   PeriodConfig,
   DayPeriodConfig,
-  RulesConfig,
-  SubjectPriority,
 } from "../types";
+import { useSessions } from "../hooks/useSessions";
+import { useAssignments } from "../hooks/useAssignments";
+import { useLeaveRequests } from "../hooks/useLeaveRequests";
+import { useTimetableEntries } from "../hooks/useTimetableEntries";
+import { useVenues } from "../hooks/useVenues";
+import { useSubjects } from "../hooks/useSubjects";
+import { useDayPeriodConfigs } from "../hooks/useDayPeriodConfigs";
 import { db, handleFirestoreError, OperationType } from "../firebase";
 import {
   doc,
@@ -80,7 +84,49 @@ import {
   Gift,
   Trophy,
   Wand2,
+  MoreVertical,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
+import { ConfirmDialog, Modal, TabButton, Tabs, useToast } from "./ui";
+
+type ConfirmState = {
+  open: boolean;
+  title: string;
+  message: string;
+  variant?: "default" | "destructive";
+  requireTyped?: string;
+  confirmLabel?: string;
+  onConfirm: () => void | Promise<void>;
+} | null;
+
+function ConfirmFromState({
+  state,
+  onClose,
+}: {
+  state: ConfirmState;
+  onClose: () => void;
+}) {
+  if (!state) {
+    return null;
+  }
+  return (
+    <ConfirmDialog
+      open={state.open}
+      onCancel={onClose}
+      onConfirm={async () => {
+        const action = state.onConfirm;
+        onClose();
+        await action();
+      }}
+      title={state.title}
+      message={state.message}
+      variant={state.variant ?? "default"}
+      requireTypedConfirmation={state.requireTyped}
+      confirmLabel={state.confirmLabel}
+    />
+  );
+}
 import { INITIAL_TEACHERS } from "../data";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -89,13 +135,13 @@ const getTimetableCell = (
   periodIdx: number,
   dateStr?: string,
 ) => {
-  if (!teacher.timetable || !dateStr) return null;
+  if (!teacher.timetable || !dateStr) {return null;}
   const dateUsed = parseISO(dateStr);
   const dayIndexUsed = dateUsed.getDay() === 0 ? 6 : dateUsed.getDay() - 1;
   const cycleKey = getCycleForDate(dateUsed) === 1 ? "cycle1" : "cycle2";
   const dayKey = dayIndexUsed.toString();
   const timetable = (teacher.timetable as any)[cycleKey];
-  if (!timetable || !timetable[dayKey]) return null;
+  if (!timetable || !timetable[dayKey]) {return null;}
   return timetable[dayKey][periodIdx] || null;
 };
 
@@ -120,20 +166,17 @@ import {
   isAfter,
   isBefore,
   startOfDay,
+  startOfMonth,
+  endOfMonth,
+  getDay,
 } from "date-fns";
 
 interface Props {
   user: Teacher;
   teachers: Teacher[];
-  sessions: ExamSession[];
-  assignments: Assignment[];
-  setAssignments: React.Dispatch<React.SetStateAction<Assignment[]>>;
-  leaveRequests: LeaveRequest[];
-  entries: TimetableEntry[];
-  venues: Venue[];
-  subjects: Subject[];
   lockedDates: string[];
-  dayPeriodConfigs: DayPeriodConfig[];
+  wideLayout?: boolean;
+  onToggleWideLayout?: () => void;
 }
 
 const getAssignmentKey = (
@@ -172,15 +215,15 @@ const getEntryTimes = (entry: TimetableEntry, allEntries: TimetableEntry[]) => {
     )
     .sort((a, b) => {
       const getPriority = (type: string) => {
-        if (type === "P1") return 1;
-        if (type === "P2") return 2;
-        if (type === "P3") return 3;
-        if (type === "Prac") return 0;
+        if (type === "P1") {return 1;}
+        if (type === "P2") {return 2;}
+        if (type === "P3") {return 3;}
+        if (type === "Prac") {return 0;}
         return 4;
       };
       const pA = getPriority(a.paperType);
       const pB = getPriority(b.paperType);
-      if (pA !== pB) return pA - pB;
+      if (pA !== pB) {return pA - pB;}
       return a.id.localeCompare(b.id);
     });
 
@@ -248,13 +291,13 @@ const isTeacherRestricted = (teacher: Teacher, subject: string) => {
   const isArt = targetSubject === "visual art";
 
   if (isCAT || isIT) {
-    if (isITSpecialistTeacher(teacher)) return true;
+    if (isITSpecialistTeacher(teacher)) {return true;}
   }
   if (isLS) {
-    if (isLSSpecialistTeacher(teacher)) return true;
+    if (isLSSpecialistTeacher(teacher)) {return true;}
   }
   if (isArt) {
-    if (isArtSpecialistTeacher(teacher)) return true;
+    if (isArtSpecialistTeacher(teacher)) {return true;}
   }
 
   return teacherSubjects.some((ts) => {
@@ -278,9 +321,9 @@ const isTechnicalStaffEligible = (teacher: Teacher, subject: string) => {
   const isLS = s === "ls" || s === "life science" || s === "life sciences" || s.includes("life science");
   const isArt = s === "visual art" || s.includes("visual art");
 
-  if (isCAT || isIT) return isITSpecialistTeacher(teacher);
-  if (isLS) return isLSSpecialistTeacher(teacher);
-  if (isArt) return isArtSpecialistTeacher(teacher);
+  if (isCAT || isIT) {return isITSpecialistTeacher(teacher);}
+  if (isLS) {return isLSSpecialistTeacher(teacher);}
+  if (isArt) {return isArtSpecialistTeacher(teacher);}
 
   // Strictly only these people can do Tech
   return false;
@@ -302,18 +345,798 @@ const isTechnicalSubject = (subject: string) => {
          s.includes("visual art");
 };
 
+type WorkloadBreakdown = {
+  morning: number;
+  afternoon: number;
+  tech: number;
+  standby: number;
+};
+
+function WorkloadBar({
+  breakdown,
+  assigned,
+  target,
+  onClick,
+}: {
+  breakdown: WorkloadBreakdown;
+  assigned: number;
+  target: number;
+  onClick?: () => void;
+}) {
+  const overload = target > 0 && assigned > target;
+  const segments: Array<{ v: number; cls: string; label: string }> = [
+    { v: breakdown.morning, cls: "bg-gray-300", label: "Morning" },
+    { v: breakdown.afternoon, cls: "bg-gray-500", label: "Afternoon" },
+    { v: breakdown.tech, cls: "bg-blue-500", label: "Tech" },
+    { v: breakdown.standby, cls: "bg-emerald-500", label: "Standby" },
+  ];
+
+  let used = 0;
+  const rendered = segments.map((seg) => {
+    const raw = target > 0 ? (seg.v / target) * 100 : 0;
+    const headroom = Math.max(0, 100 - used);
+    const w = Math.max(0, Math.min(raw, headroom));
+    used += w;
+    return { ...seg, w };
+  });
+
+  const overflowPct = overload
+    ? Math.min(((assigned - target) / target) * 100, 35)
+    : 0;
+  const tooltip = onClick
+    ? `Morning ${breakdown.morning} · Afternoon ${breakdown.afternoon} · Tech ${breakdown.tech} · Standby ${breakdown.standby} — click to inspect`
+    : `Morning ${breakdown.morning} · Afternoon ${breakdown.afternoon} · Tech ${breakdown.tech} · Standby ${breakdown.standby}`;
+
+  const Wrapper = onClick ? "button" : "div";
+  return (
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`flex flex-col gap-1 min-w-[140px] text-left ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity rounded" : ""}`}
+      title={tooltip}
+      aria-label={onClick ? "Inspect workload details" : undefined}
+    >
+      <div className="flex items-stretch h-2 rounded-full overflow-hidden bg-gray-100">
+        <div className="flex flex-1">
+          {rendered.map((s) =>
+            s.w > 0 ? (
+              <div
+                key={s.label}
+                className={s.cls}
+                style={{ width: `${s.w}%` }}
+              />
+            ) : null,
+          )}
+        </div>
+        {overload && (
+          <div
+            className="bg-curro-red"
+            style={{ width: `${overflowPct}%`, marginLeft: 1 }}
+          />
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-1 text-[10px] font-mono leading-none">
+        <span
+          className={`font-black ${overload ? "text-curro-red" : "text-curro-blue"}`}
+        >
+          {assigned.toLocaleString()}
+        </span>
+        <span className="text-text-muted">
+          / {target.toLocaleString()} min
+        </span>
+      </div>
+    </Wrapper>
+  );
+}
+
+type OverflowItem = {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+};
+
+function OverflowMenu({
+  items,
+  danger,
+}: {
+  items: OverflowItem[];
+  danger?: OverflowItem;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`p-2 rounded-lg transition-colors ${open ? "bg-gray-100 text-text-dark" : "hover:bg-gray-100 text-text-muted hover:text-text-dark"}`}
+        title="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreVertical className="w-3.5 h-3.5" />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full mt-1 z-30 bg-white rounded-xl border border-gray-100 shadow-lg py-1 min-w-[180px] animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          {items.map((it) => (
+            <button
+              key={it.label}
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                it.onClick();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-text-dark hover:bg-gray-50 transition-colors text-left"
+            >
+              <span className="text-text-muted">{it.icon}</span>
+              {it.label}
+            </button>
+          ))}
+          {danger && (
+            <>
+              <div className="my-1 border-t border-gray-100" />
+              <button
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  danger.onClick();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-50 transition-colors text-left"
+              >
+                {danger.icon}
+                {danger.label}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type FacultyRowProps = {
+  teacher: Teacher;
+  hasPendingLeave: boolean;
+  currentTeachingGrade: string | number | null;
+  assigned: number;
+  target: number;
+  breakdown: WorkloadBreakdown;
+  wideMode?: boolean;
+  onUpdate: (id: string, updates: Partial<Teacher>) => void;
+  onBreakDuty: () => void;
+  onHomeRoom: () => void;
+  onLeave: () => void;
+  onSubjects: () => void;
+  onTimetable: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onInspect?: () => void;
+};
+
+const FacultyRow: React.FC<FacultyRowProps> = ({
+  teacher: t,
+  hasPendingLeave,
+  currentTeachingGrade,
+  assigned,
+  target,
+  breakdown,
+  wideMode = false,
+  onUpdate,
+  onBreakDuty,
+  onHomeRoom,
+  onLeave,
+  onSubjects,
+  onTimetable,
+  onEdit,
+  onRemove,
+  onInspect,
+}) => {
+  const isOps = t.invigilationPreference === "OPS";
+  const isMarathon = t.invigilationPreference === "MARATHON";
+  const isMerikeVanDyk =
+    t.firstName.toLowerCase().includes("merike") &&
+    t.lastName.toLowerCase().includes("van dyk");
+  const hasHall = t.hallPass ?? !isMerikeVanDyk;
+  const subjectCode = t.subjects?.[0]?.code;
+  const subjectExtra =
+    (t.subjects?.length ?? 0) > 1
+      ? `+${(t.subjects?.length ?? 0) - 1}`
+      : null;
+
+  const cyclePref = () => {
+    let next: "SCATTERED" | "MARATHON" | "OPS" = "SCATTERED";
+    if (t.invigilationPreference === "SCATTERED") {
+      next = "MARATHON";
+    } else if (t.invigilationPreference === "MARATHON") {
+      next = "OPS";
+    } else {
+      next = "SCATTERED";
+    }
+    const updates: Partial<Teacher> = { invigilationPreference: next };
+    if (next === "OPS") {
+      updates.workloadPercentage = 0;
+      updates.canInvigilate = false;
+      updates.hallPass = false;
+    } else if (t.invigilationPreference === "OPS") {
+      updates.workloadPercentage = 100;
+      updates.canInvigilate = true;
+    }
+    onUpdate(t.id, updates);
+  };
+
+  return (
+    <div
+      className={`group p-3 px-4 transition-colors ${
+        hasPendingLeave
+          ? "bg-yellow-50 border-l-4 border-yellow-400 hover:bg-yellow-100/60"
+          : isOps
+            ? "bg-purple-50/40 hover:bg-purple-50/70"
+            : "hover:bg-gray-50"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center font-black text-sm transition-all ${
+            isOps
+              ? "bg-purple-100 text-purple-700 ring-1 ring-purple-200"
+              : "bg-bg-gray text-curro-blue group-hover:bg-curro-blue group-hover:text-white"
+          }`}
+        >
+          {t.lastName[0]}
+        </div>
+
+        <div className="flex-1 min-w-0 flex flex-col gap-1">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="text-sm font-black text-text-dark leading-tight truncate max-w-[260px]">
+              {t.firstName} {t.lastName}
+            </span>
+            {t.hasReward && (
+              <Gift className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
+            )}
+            {subjectCode && (
+              <span className="text-[10px] font-black text-curro-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded uppercase tracking-tighter shrink-0">
+                {subjectCode}
+                {subjectExtra ? ` ${subjectExtra}` : ""}
+              </span>
+            )}
+            {currentTeachingGrade && (
+              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter border border-emerald-100 shrink-0">
+                <Circle className="w-1.5 h-1.5 fill-current animate-pulse" />
+                Now Gr {currentTeachingGrade}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 text-[10px] text-text-muted font-medium min-w-0 flex-wrap leading-none">
+            <span className="font-black uppercase tracking-tighter">
+              {t.id}
+            </span>
+            {t.email && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span
+                  className="truncate max-w-[140px]"
+                  title={t.email}
+                >
+                  {t.email}
+                </span>
+              </>
+            )}
+            {t.homeRoomGrade && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="font-black uppercase tracking-tighter text-indigo-600">
+                  HR {t.homeRoomGrade}E{t.homeRoomClass}
+                </span>
+              </>
+            )}
+            <span className="text-gray-300">·</span>
+            <span
+              className={`font-black uppercase tracking-tighter ${isMarathon ? "text-orange-600" : isOps ? "text-purple-600" : "text-sky-600"}`}
+            >
+              {t.invigilationPreference || "SCATTERED"}
+            </span>
+            {(t.breakDutyDates?.length || 0) > 0 && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="font-black uppercase tracking-tighter text-rose-600 inline-flex items-center gap-0.5">
+                  <Coffee className="w-2.5 h-2.5" />
+                  BD {t.breakDutyDates?.length}
+                </span>
+              </>
+            )}
+            {(t.afternoonDutyDates?.length || 0) > 0 && (
+              <>
+                <span className="text-gray-300">·</span>
+                <span className="font-black uppercase tracking-tighter text-amber-600 inline-flex items-center gap-0.5">
+                  <Clock3 className="w-2.5 h-2.5" />
+                  AD {t.afternoonDutyDates?.length}
+                </span>
+              </>
+            )}
+            <span className="text-gray-300">·</span>
+            <span
+              className={`font-black uppercase tracking-tighter inline-flex items-center gap-0.5 ${hasHall ? "text-curro-blue" : "text-curro-red"}`}
+            >
+              {hasHall ? (
+                <ShieldCheck className="w-2.5 h-2.5" />
+              ) : (
+                <ShieldAlert className="w-2.5 h-2.5" />
+              )}
+              {hasHall ? "Hall" : "Restricted"}
+            </span>
+          </div>
+        </div>
+
+        <WorkloadBar
+          breakdown={breakdown}
+          assigned={assigned}
+          target={target}
+          onClick={onInspect}
+        />
+
+        <div className="flex items-center gap-1 bg-gray-50 px-1.5 py-1 rounded border border-gray-100 shrink-0">
+          <input
+            type="number"
+            value={t.workloadPercentage ?? 100}
+            onChange={(e) =>
+              onUpdate(t.id, {
+                workloadPercentage: parseInt(e.target.value) || 0,
+              })
+            }
+            className="w-8 bg-transparent text-[10px] font-black text-curro-blue text-right focus:outline-none focus:ring-1 focus:ring-curro-blue rounded border-none p-0"
+            title="Workload weighting %"
+          />
+          <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">
+            %
+          </span>
+        </div>
+
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            onClick={cyclePref}
+            className={`p-2 rounded-lg transition-all ${
+              isMarathon
+                ? "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                : isOps
+                  ? "bg-purple-50 text-purple-600 hover:bg-purple-100"
+                  : "bg-sky-50 text-sky-600 hover:bg-sky-100"
+            }`}
+            title={`Preference: ${t.invigilationPreference || "SCATTERED"} (click to cycle)`}
+            aria-label="Cycle invigilation preference"
+          >
+            {isMarathon ? (
+              <Clock3 className="w-3.5 h-3.5" />
+            ) : isOps ? (
+              <ShieldCheck className="w-3.5 h-3.5" />
+            ) : (
+              <Zap className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            onClick={onEdit}
+            className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+            title="Edit profile"
+            aria-label="Edit profile"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          {wideMode ? (
+            <>
+              <button
+                onClick={() => onUpdate(t.id, { hasReward: !t.hasReward })}
+                className={`p-2 rounded-lg transition-colors ${t.hasReward ? "bg-amber-50 text-amber-600 hover:bg-amber-100" : "hover:bg-amber-50 text-text-muted hover:text-amber-600"}`}
+                title={t.hasReward ? "Disable reward" : "Enable reward"}
+                aria-label="Toggle reward"
+              >
+                <Trophy
+                  className={`w-3.5 h-3.5 ${t.hasReward ? "fill-amber-400" : ""}`}
+                />
+              </button>
+              <button
+                onClick={() => onUpdate(t.id, { hallPass: !hasHall })}
+                className={`p-2 rounded-lg transition-colors ${hasHall ? "bg-blue-50 text-curro-blue hover:bg-blue-100" : "bg-red-50 text-curro-red hover:bg-red-100"}`}
+                title={hasHall ? "Restrict hall pass" : "Grant hall pass"}
+                aria-label="Toggle hall pass"
+              >
+                {hasHall ? (
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                ) : (
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                onClick={onBreakDuty}
+                className={`p-2 rounded-lg transition-colors ${(t.breakDutyDates?.length || 0) > 0 ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "hover:bg-rose-50 text-text-muted hover:text-rose-600"}`}
+                title="Break duty dates"
+                aria-label="Break duty dates"
+              >
+                <Coffee className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onHomeRoom}
+                className={`p-2 rounded-lg transition-colors ${t.homeRoomGrade ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" : "hover:bg-indigo-50 text-text-muted hover:text-indigo-600"}`}
+                title="Home room class"
+                aria-label="Home room class"
+              >
+                <Home className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onLeave}
+                className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+                title="Schedule leave"
+                aria-label="Schedule leave"
+              >
+                <CalendarOff className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onSubjects}
+                className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+                title="Manage subjects"
+                aria-label="Manage subjects"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onTimetable}
+                className="p-2 hover:bg-red-50 text-text-muted hover:text-curro-red rounded-lg transition-colors"
+                title="Edit timetable"
+                aria-label="Edit timetable"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+              </button>
+              <div className="w-px h-5 bg-gray-200 mx-0.5" />
+              <button
+                onClick={onRemove}
+                className="p-2 hover:bg-red-50 text-text-muted hover:text-red-600 rounded-lg transition-colors"
+                title="Remove staff"
+                aria-label="Remove staff"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          ) : (
+            <OverflowMenu
+              items={[
+                {
+                  label: t.hasReward ? "Disable reward" : "Enable reward",
+                  icon: (
+                    <Trophy
+                      className={`w-3.5 h-3.5 ${t.hasReward ? "text-amber-500 fill-amber-400" : ""}`}
+                    />
+                  ),
+                  onClick: () =>
+                    onUpdate(t.id, { hasReward: !t.hasReward }),
+                },
+                {
+                  label: hasHall ? "Restrict hall pass" : "Grant hall pass",
+                  icon: hasHall ? (
+                    <ShieldCheck className="w-3.5 h-3.5 text-curro-blue" />
+                  ) : (
+                    <ShieldAlert className="w-3.5 h-3.5 text-curro-red" />
+                  ),
+                  onClick: () =>
+                    onUpdate(t.id, { hallPass: !hasHall }),
+                },
+                {
+                  label: "Break duty dates",
+                  icon: <Coffee className="w-3.5 h-3.5" />,
+                  onClick: onBreakDuty,
+                },
+                {
+                  label: "Home room class",
+                  icon: <Home className="w-3.5 h-3.5" />,
+                  onClick: onHomeRoom,
+                },
+                {
+                  label: "Schedule leave",
+                  icon: <CalendarOff className="w-3.5 h-3.5" />,
+                  onClick: onLeave,
+                },
+                {
+                  label: "Manage subjects",
+                  icon: <BookOpen className="w-3.5 h-3.5" />,
+                  onClick: onSubjects,
+                },
+                {
+                  label: "Edit timetable",
+                  icon: <Calendar className="w-3.5 h-3.5" />,
+                  onClick: onTimetable,
+                },
+              ]}
+              danger={{
+                label: "Remove staff",
+                icon: <Trash2 className="w-3.5 h-3.5" />,
+                onClick: onRemove,
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+type DayMinutes = {
+  morning: number;
+  afternoon: number;
+  tech: number;
+  standby: number;
+};
+
+const periodDurationMinutes = (period: { start: string; end: string }) => {
+  const [sh, sm] = period.start.split(":").map(Number);
+  const [eh, em] = period.end.split(":").map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
+};
+
+const InspectionCalendar: React.FC<{
+  teacherId: string;
+  entries: TimetableEntry[];
+  dayPeriodConfigs: DayPeriodConfig[];
+  onPickDate: (dateIso: string) => void;
+}> = ({ teacherId, entries, dayPeriodConfigs, onPickDate }) => {
+  const dateBuckets = useMemo<Map<string, DayMinutes>>(() => {
+    const buckets = new Map<string, DayMinutes>();
+    for (const entry of entries) {
+      if (!entry.invigilatorAssignments) {
+        continue;
+      }
+      const d = parseISO(entry.date);
+      const dayName = format(d, "EEEE");
+      const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
+      const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
+      const datePeriods = dateConfig
+        ? dateConfig.periods
+        : dayConfig
+          ? dayConfig.periods
+          : dayName === "Wednesday"
+            ? WEDNESDAY_PERIODS
+            : PERIODS;
+      for (const [key, tId] of Object.entries(entry.invigilatorAssignments)) {
+        if (tId !== teacherId) {
+          continue;
+        }
+        const parts = key.split("_");
+        const pIdx = parseInt(parts[0]);
+        const vId = parts[1];
+        const role = parts[2];
+        const period = datePeriods[pIdx] || datePeriods[0];
+        if (!period) {
+          continue;
+        }
+        const minutes = periodDurationMinutes(period);
+        const isTech =
+          key.includes("_TECH") ||
+          key.includes("_TECHNICAL") ||
+          role === "TECH" ||
+          role === "TECHNICAL";
+        const isStandby =
+          vId === "GRADE" || key.includes("_STANDBY") || role === "STANDBY";
+        const bucket = buckets.get(entry.date) || {
+          morning: 0,
+          afternoon: 0,
+          tech: 0,
+          standby: 0,
+        };
+        if (isTech) {
+          bucket.tech += minutes;
+        } else if (isStandby) {
+          bucket.standby += minutes;
+        } else if (entry.session === "MORNING") {
+          bucket.morning += minutes;
+        } else {
+          bucket.afternoon += minutes;
+        }
+        buckets.set(entry.date, bucket);
+      }
+    }
+    return buckets;
+  }, [entries, teacherId, dayPeriodConfigs]);
+
+  const monthGrids = useMemo(() => {
+    if (dateBuckets.size === 0) {
+      return [];
+    }
+    const sortedDates: string[] = [...dateBuckets.keys()].sort();
+    const minDate = startOfMonth(parseISO(sortedDates[0]));
+    const maxDate = endOfMonth(parseISO(sortedDates[sortedDates.length - 1]));
+    const monthsSet = new Set<string>();
+    let cursor = minDate;
+    while (cursor <= maxDate) {
+      monthsSet.add(format(cursor, "yyyy-MM"));
+      cursor = startOfMonth(addDays(endOfMonth(cursor), 1));
+    }
+    return Array.from(monthsSet).map((monthKey) => {
+      const anchor = parseISO(`${monthKey}-01`);
+      const days = eachDayOfInterval({
+        start: startOfMonth(anchor),
+        end: endOfMonth(anchor),
+      });
+      // Pad start so Monday is first column (getDay: 0=Sun..6=Sat)
+      const firstDow = getDay(days[0]);
+      const leadingBlanks = (firstDow + 6) % 7;
+      return {
+        monthKey,
+        title: format(anchor, "MMMM yyyy"),
+        leadingBlanks,
+        days,
+      };
+    });
+  }, [dateBuckets]);
+
+  if (dateBuckets.size === 0) {
+    return (
+      <div className="p-20 text-center flex flex-col items-center">
+        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+          <CalendarRange className="w-8 h-8 text-gray-300" />
+        </div>
+        <h4 className="text-lg font-black text-text-dark uppercase tracking-tight">
+          No assignments yet
+        </h4>
+        <p className="text-text-muted text-xs font-medium max-w-xs mx-auto mt-2 leading-relaxed">
+          This teacher has no invigilation assignments. Check back once the
+          scheduler has run.
+        </p>
+      </div>
+    );
+  }
+
+  const today = startOfToday();
+  const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  return (
+    <div className="p-6 overflow-y-auto max-h-[calc(100vh-22rem)] min-h-[500px]">
+      <div className="flex items-center gap-4 mb-4 text-[10px] font-black text-text-muted uppercase tracking-widest">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-curro-blue" /> Morning
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-emerald-500" /> Afternoon
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-curro-red" /> Tech
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded bg-amber-500" /> Standby
+        </span>
+        <span className="ml-2 text-text-muted">Numbers are minutes assigned</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {monthGrids.map((m) => (
+          <div
+            key={m.monthKey}
+            className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm"
+          >
+            <h4 className="text-sm font-black text-text-dark uppercase tracking-tight mb-3">
+              {m.title}
+            </h4>
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {weekDayLabels.map((d) => (
+                <div
+                  key={d}
+                  className="text-[9px] font-black text-text-muted uppercase tracking-widest text-center py-1"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: m.leadingBlanks }).map((_, i) => (
+                <div key={`blank-${i}`} />
+              ))}
+              {m.days.map((d) => {
+                const iso = format(d, "yyyy-MM-dd");
+                const bucket = dateBuckets.get(iso);
+                const isToday = isSameDay(d, today);
+                if (!bucket) {
+                  return (
+                    <div
+                      key={iso}
+                      className={`min-h-[64px] rounded-lg flex items-center justify-center text-[11px] font-bold text-gray-300 ${isToday ? "ring-1 ring-curro-blue/40" : ""}`}
+                    >
+                      {format(d, "d")}
+                    </div>
+                  );
+                }
+                const total =
+                  bucket.morning +
+                  bucket.afternoon +
+                  bucket.tech +
+                  bucket.standby;
+                return (
+                  <button
+                    key={iso}
+                    onClick={() => onPickDate(iso)}
+                    className={`min-h-[64px] rounded-lg overflow-hidden bg-white border border-gray-100 hover:border-curro-blue hover:shadow-md transition-all flex flex-col text-left ${isToday ? "ring-2 ring-curro-blue" : ""}`}
+                    title={`${format(d, "EEEE d MMM")} — Morning ${bucket.morning} min · Afternoon ${bucket.afternoon} min · Tech ${bucket.tech} min · Standby ${bucket.standby} min · Total ${total} min`}
+                  >
+                    <div className="flex items-center justify-between px-1 pt-0.5">
+                      <span className="text-[11px] font-black text-text-dark leading-none">
+                        {format(d, "d")}
+                      </span>
+                      <span className="text-[8px] font-black text-text-muted leading-none">
+                        {total}m
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 grid-rows-2 flex-1 gap-px mt-0.5 bg-gray-100">
+                      <div
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.morning > 0 ? "bg-curro-blue text-white" : "bg-blue-50 text-blue-200"}`}
+                        title={`Morning: ${bucket.morning} min`}
+                      >
+                        {bucket.morning || ""}
+                      </div>
+                      <div
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.afternoon > 0 ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-200"}`}
+                        title={`Afternoon: ${bucket.afternoon} min`}
+                      >
+                        {bucket.afternoon || ""}
+                      </div>
+                      <div
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.tech > 0 ? "bg-curro-red text-white" : "bg-red-50 text-red-200"}`}
+                        title={`Tech: ${bucket.tech} min`}
+                      >
+                        {bucket.tech || ""}
+                      </div>
+                      <div
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.standby > 0 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-200"}`}
+                        title={`Standby: ${bucket.standby} min`}
+                      >
+                        {bucket.standby || ""}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export default function AdminPanel({
   user: activeUser,
   teachers,
-  sessions,
-  assignments,
-  leaveRequests,
-  entries,
-  venues,
-  subjects,
   lockedDates,
-  dayPeriodConfigs,
+  wideLayout = false,
+  onToggleWideLayout,
 }: Props) {
+  const { data: sessions } = useSessions();
+  const { data: assignments } = useAssignments();
+  const { data: leaveRequests } = useLeaveRequests();
+  const { data: entries } = useTimetableEntries();
+  const { data: venues } = useVenues();
+  const { data: subjects } = useSubjects();
+  const { data: dayPeriodConfigs } = useDayPeriodConfigs();
+  const toast = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd"),
   );
@@ -386,43 +1209,6 @@ export default function AdminPanel({
     { id: "finalizing", label: "Finalizing", progress: 0 },
   ]);
   const [interactiveWorkload, setInteractiveWorkload] = useState<any[]>([]);
-  const [rules, setRules] = useState<RulesConfig>(() => {
-    const saved = localStorage.getItem("packing_rules");
-    if (saved) return JSON.parse(saved);
-    return {
-      packing: {
-        maxRepacks: 100,
-        defaultDaySlotLimit: 3,
-        marathonScoreBoost: 15000,
-        prevDayScoreBoost: 20000,
-        venueRepeatScoreBoost: 40000,
-        homeRoomScoreBoost: 5000,
-        scatteredGapPenalty: 50000,
-        g12RestrictionThreshold: 0.9,
-        generalRestrictionThreshold: 0.95,
-        subjectPriorities: [
-          { pattern: "life sciences", priority: 1 },
-          { pattern: "natural sciences", priority: 2 },
-          { pattern: "mathematics", priority: 3 },
-          { pattern: "mathematical literacy", priority: 4 },
-          { pattern: "physical science", priority: 5 },
-          { pattern: "creative arts", priority: 6 },
-          { pattern: "coding", priority: 7 },
-        ]
-      },
-      equalize: {
-        passes: [
-          { limit: 3, respectRestricted: true },
-          { limit: 4, respectRestricted: true },
-          { limit: 3, respectRestricted: false }
-        ],
-        hallPassRequiredForG12: true,
-        hallPassRequiredForHall: true,
-        techSpecialistOnlyForPrac: true
-      }
-    };
-  });
-  const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
   const [genProgress, setGenProgress] = useState(0);
   const [repackCount, setRepackCount] = useState(0);
   const [genElapsedTime, setGenElapsedTime] = useState(0);
@@ -555,8 +1341,8 @@ export default function AdminPanel({
       const dayName = format(d, "EEEE");
       const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
 
-      if (dateConfig && dateConfig.periods) return dateConfig.periods;
-      if (dayConfig && dayConfig.periods) return dayConfig.periods;
+      if (dateConfig && dateConfig.periods) {return dateConfig.periods;}
+      if (dayConfig && dayConfig.periods) {return dayConfig.periods;}
       return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
     },
     [dayPeriodConfigs, selectedDate],
@@ -603,7 +1389,7 @@ export default function AdminPanel({
     const t = teachers.find(t => t.id === teacherId);
     if (t) {
       const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      if (name.includes("merike") && name.includes("van dyk")) return true;
+      if (name.includes("merike") && name.includes("van dyk")) {return true;}
     }
 
     const datePeriods = (() => {
@@ -611,13 +1397,13 @@ export default function AdminPanel({
         const d = parseISO(dateStr);
         const dayName = format(d, "EEEE");
         const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-        if (dateConfig && dateConfig.periods) return dateConfig.periods;
-        if (dayConfig && dayConfig.periods) return dayConfig.periods;
+        if (dateConfig && dateConfig.periods) {return dateConfig.periods;}
+        if (dayConfig && dayConfig.periods) {return dayConfig.periods;}
         return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
     })();
 
     const period = datePeriods[periodIdx];
-    if (!period) return false;
+    if (!period) {return false;}
 
     const request = (leaveRequests || []).find(
       (lr) =>
@@ -625,13 +1411,13 @@ export default function AdminPanel({
         lr.date === dateStr &&
         (lr.status === "APPROVED" || lr.status === "PENDING"),
     );
-    if (!request) return false;
+    if (!request) {return false;}
 
     if (teacherId === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
       return false;
     }
 
-    if (request.isFullDay) return true;
+    if (request.isFullDay) {return true;}
 
     if (request.startTime || request.endTime) {
       const pStart = period.start;
@@ -693,7 +1479,7 @@ export default function AdminPanel({
   );
 
   const handleAutoGenerate = async () => {
-    if (hasIncompleteVenues) return;
+    if (hasIncompleteVenues) {return;}
     setIsGenerating(true);
     setGenProgress(0);
     setRepackCount(0);
@@ -708,7 +1494,7 @@ export default function AdminPanel({
       const startDate = parseISO(autoFromDate);
       const endDate = parseISO(autoUntilDate);
       if (isAfter(startDate, endDate)) {
-        alert("Start date cannot be after end date.");
+        toast.error("Start date cannot be after end date.");
         setIsGenerating(false);
         clearInterval(timer);
         return;
@@ -738,14 +1524,14 @@ export default function AdminPanel({
       let totalReqMinutes = 0;
       entries.forEach(e => {
         const eDate = parseISO(e.date);
-        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) return;
+        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) {return;}
         const relevantPIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
         const assignedVenuesList = venues.filter((v) => e.venueIds?.includes(v.id));
         const datePeriods = getPeriodsForDate(e.date);
         
         relevantPIdxs.forEach(pIdx => {
           const p = datePeriods[pIdx];
-          if (!p) return;
+          if (!p) {return;}
           const [h1, m1] = p.start.split(":").map(Number);
           const [h2, m2] = p.end.split(":").map(Number);
           const dur = (h2 * 60 + m2 - (h1 * 60 + m1));
@@ -771,13 +1557,13 @@ export default function AdminPanel({
       const teacherHoursInRange = Object.fromEntries(localTeachers.map(t => [t.id, 0]));
       
       entries.forEach(e => {
-        if (!e.invigilatorAssignments) return;
+        if (!e.invigilatorAssignments) {return;}
         const eDate = parseISO(e.date);
         const inRange = !isBefore(eDate, startDate) && !isAfter(eDate, endDate);
         const datePeriods = getPeriodsForDate(e.date);
         
         Object.entries(e.invigilatorAssignments).forEach(([key, tid]) => {
-          if (teacherHours[tid] === undefined) return;
+          if (teacherHours[tid] === undefined) {return;}
           
           const isTech = key.includes("_TECH_");
           if (!inRange || isTech) {
@@ -821,14 +1607,14 @@ export default function AdminPanel({
 
         let success = false;
         let dayRepacks = 0;
-        const MAX_DAY_REPACKS = rules.packing.maxRepacks;
+        const MAX_DAY_REPACKS = 100;
 
         const hoursSnapshot = { ...teacherHours };
         const standbySnapshot = { ...standbyCounts };
         const rangeHoursSnapshot = { ...teacherHoursInRange };
 
         while (!success && dayRepacks < MAX_DAY_REPACKS) {
-          if (dayRepacks > 0) setRepackCount(prev => prev + 1);
+          if (dayRepacks > 0) {setRepackCount(prev => prev + 1);}
           
           const assignedAsTechToday = new Set<string>();
           const dayAssignments: { [tId: string]: { [pIdx: number]: string } } = {};
@@ -843,7 +1629,7 @@ export default function AdminPanel({
           dayEntries.forEach(e => {
             if ((e.date === "2026-06-18" || e.date === "2026-06-19") && e.subject.toLowerCase().includes("visual art")) {
               const pIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
-              if (!e.invigilatorAssignments) e.invigilatorAssignments = {};
+              if (!e.invigilatorAssignments) {e.invigilatorAssignments = {};}
               pIdxs.forEach(p => {
                 const venueId = e.venueIds?.[0] || "MANUAL";
                 const key = getAssignmentKey(p, venueId, "TECH", 0);
@@ -853,7 +1639,7 @@ export default function AdminPanel({
           });
 
           dayEntries.forEach(e => {
-            if (!e.invigilatorAssignments) e.invigilatorAssignments = {};
+            if (!e.invigilatorAssignments) {e.invigilatorAssignments = {};}
             const isPrac = e.paperType === "Prac";
             if (isPrac) {
               const pIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
@@ -883,7 +1669,7 @@ export default function AdminPanel({
 
                 const finalTid = e.invigilatorAssignments![key];
                 if (finalTid) {
-                  if (!dayAssignments[finalTid]) dayAssignments[finalTid] = {};
+                  if (!dayAssignments[finalTid]) {dayAssignments[finalTid] = {};}
                   dayAssignments[finalTid][p] = "TECH";
                   assignedAsTechToday.add(finalTid);
                 }
@@ -933,22 +1719,26 @@ export default function AdminPanel({
 
           const getSubjectPriority = (subject: string) => {
             const s = (subject || "").toLowerCase();
-            for (const p of rules.packing.subjectPriorities) {
-              if (s.includes(p.pattern.toLowerCase())) return p.priority;
-            }
+            if (s.includes("english")) {return 1;}
+            if (s.includes("afrikaans") || s.includes("1st additional") || s.includes("additional language")) {return 2;}
+            if (s.includes("mathematics") && !s.includes("literacy")) {return 3;}
+            if (s.includes("mathematical literacy") || s.includes("math lit")) {return 4;}
+            if (s.includes("physical science")) {return 5;}
+            if (s.includes("creative arts")) {return 6;}
+            if (s.includes("coding") || s.includes("robotics")) {return 7;}
             return 100;
           };
 
           stints.sort((a, b) => {
-            if (a.role !== b.role) return a.role === "STANDBY" ? 1 : -1;
-            if (a.entry.grade !== b.entry.grade) return b.entry.grade - a.entry.grade;
+            if (a.role !== b.role) {return a.role === "STANDBY" ? 1 : -1;}
+            if (a.entry.grade !== b.entry.grade) {return b.entry.grade - a.entry.grade;}
             if (a.role === "INVIGILATOR") {
               const pA = getSubjectPriority(a.entry.subject);
               const pB = getSubjectPriority(b.entry.subject);
-              if (pA !== pB) return pA - pB;
+              if (pA !== pB) {return pA - pB;}
               const studentsA = a.entry.totalStudents || 0;
               const studentsB = b.entry.totalStudents || 0;
-              if (studentsA !== studentsB) return studentsB - studentsA;
+              if (studentsA !== studentsB) {return studentsB - studentsA;}
             }
             return b.pIdxs.length - a.pIdxs.length;
           });
@@ -958,7 +1748,7 @@ export default function AdminPanel({
             localizedAssignments[e.id] = {};
             if (e.invigilatorAssignments) {
               Object.entries(e.invigilatorAssignments).forEach(([k, v]) => {
-                if (k.includes("_TECH_")) localizedAssignments[e.id][k] = v;
+                if (k.includes("_TECH_")) {localizedAssignments[e.id][k] = v;}
               });
             }
           });
@@ -969,46 +1759,50 @@ export default function AdminPanel({
 
             const candidates = localTeachers
               .filter(t => {
-                if (t.invigilationPreference === "OPS") return false;
+                if (t.invigilationPreference === "OPS") {return false;}
                 const tName = `${t.firstName} ${t.lastName}`.toLowerCase();
                 const isMerike = tName.includes("merike") && tName.includes("van dyk");
                 const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
                 const isFranz = t.id === "NORT" || t.id === "FRAN" || tName.includes("franz") || tName.includes("nortje");
-                if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz) || isMerike) return false;
-                if (assignedAsTechToday.has(t.id)) return false;
+                if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz) || isMerike) {return false;}
+                if (assignedAsTechToday.has(t.id)) {return false;}
                 
-                if (t.hasReward && rewardDays[t.id] === dateStr && dayRepacks < MAX_DAY_REPACKS * 0.8) return false;
+                if (t.hasReward && rewardDays[t.id] === dateStr && dayRepacks < MAX_DAY_REPACKS * 0.8) {return false;}
 
                 const currentDaySlots = Object.keys(dayAssignments[t.id] || {}).length;
-                let daySlotLimit = rules.packing.defaultDaySlotLimit;
-                if (dayRepacks > MAX_DAY_REPACKS * 0.95) daySlotLimit = 4;
-                if (currentDaySlots >= daySlotLimit) return false;
+                let daySlotLimit = 3;
+                if (dayRepacks > MAX_DAY_REPACKS * 0.95) {daySlotLimit = 4;}
+                if (currentDaySlots >= daySlotLimit) {return false;}
 
                 for (const p of pIdxs) {
-                  if (dayAssignments[t.id]?.[p]) return false;
-                  if (isTeacherOnLeaveAtPeriod(t.id, p, dateStr)) return false;
-                  if (getPeriodsForDate(dateStr)[p]?.break && t.breakDutyDates?.includes(dateStr)) return false;
-                  if (entry.session === 'AFTERNOON' && t.afternoonDutyDates?.includes(dateStr)) return false;
+                  if (dayAssignments[t.id]?.[p]) {return false;}
+                  if (isTeacherOnLeaveAtPeriod(t.id, p, dateStr)) {return false;}
+                  if (getPeriodsForDate(dateStr)[p]?.break && t.breakDutyDates?.includes(dateStr)) {return false;}
+                  if (entry.session === 'AFTERNOON' && t.afternoonDutyDates?.includes(dateStr)) {return false;}
                 }
 
                 const isRestricted = isTeacherRestricted(t, entry.subject);
                 const isG12SubToday = grade12SubjectsToday.some(s => isTeacherRestricted(t, s));
                 
-                if (dayRepacks < MAX_DAY_REPACKS * rules.packing.g12RestrictionThreshold) {
-                  if (isG12 && (isRestricted || isG12SubToday)) return false;
+                if (dayRepacks < MAX_DAY_REPACKS * 0.9) {
+                  if (isG12 && (isRestricted || isG12SubToday)) {return false;}
+                  if (isRestricted) {return false;}
                 }
                 
-                if (dayRepacks < MAX_DAY_REPACKS * rules.packing.generalRestrictionThreshold) {
-                  if (isRestricted) return false;
+                if (dayRepacks < MAX_DAY_REPACKS * 0.95) {
+                  for (const p of pIdxs) {
+                    if (getPeriodsForDate(dateStr)[p]?.break && t.breakDutyDates?.includes(dateStr)) {return false;}
+                    if (entry.session === 'AFTERNOON' && t.afternoonDutyDates?.includes(dateStr)) {return false;}
+                  }
                 }
 
-                if (day.getDay() === 3 && pIdxs[0] === 0 && t.homeRoomGrade && t.homeRoomGrade !== entry.grade) return false;
+                if (day.getDay() === 3 && pIdxs[0] === 0 && t.homeRoomGrade && t.homeRoomGrade !== entry.grade) {return false;}
 
                 if (dayRepacks < MAX_DAY_REPACKS * 0.7) {
                   if (entry.grade !== 12 && venueId !== "Hall" && venueId !== "GRADE" && t.homeRoomClass) {
                     const venue = venues.find(v => v.id === venueId);
                     const vN = venue?.name?.toLowerCase() || "";
-                    if (!(vN.includes(`e${t.homeRoomClass}`) || vN.includes(`class ${t.homeRoomClass}`) || (vN.includes(` ${t.homeRoomClass}`) && !vN.includes("grade")))) return false;
+                    if (!(vN.includes(`e${t.homeRoomClass}`) || vN.includes(`class ${t.homeRoomClass}`) || (vN.includes(` ${t.homeRoomClass}`) && !vN.includes("grade")))) {return false;}
                   }
                 }
                 
@@ -1016,13 +1810,13 @@ export default function AdminPanel({
                    const firstP = pIdxs[0];
                    const lastP = pIdxs[pIdxs.length - 1];
                    if (dayAssignments[t.id]?.[firstP - 1] || dayAssignments[t.id]?.[lastP + 1]) {
-                     if (dayRepacks < MAX_DAY_REPACKS * 0.6) return false;
+                     if (dayRepacks < MAX_DAY_REPACKS * 0.6) {return false;}
                    }
                 }
 
                 return true;
               })
-                .map(t => {
+              .map(t => {
                 let score = 10000;
                 const currentRelWorkload = (teacherHoursInRange[t.id] || 0) / (teacherRangeTargets[t.id] || 1);
                 score -= currentRelWorkload * 50000;
@@ -1031,15 +1825,15 @@ export default function AdminPanel({
                   score -= (standbyCounts[t.id] || 0) * 10000;
                 } else {
                   if (t.invigilationPreference === "MARATHON") {
-                    score += rules.packing.marathonScoreBoost;
-                    if (assignedOnPrevDay.has(t.id)) score += rules.packing.prevDayScoreBoost;
+                    score += 15000;
+                    if (assignedOnPrevDay.has(t.id)) {score += 20000;}
                     const hasVenueAssignment = Object.values(dayAssignments[t.id] || {}).includes(venueId);
-                    if (hasVenueAssignment) score += rules.packing.venueRepeatScoreBoost;
+                    if (hasVenueAssignment) {score += 40000;}
                     const firstP = pIdxs[0];
                     const lastP = pIdxs[pIdxs.length - 1];
-                    if (dayAssignments[t.id]?.[firstP - 1] || dayAssignments[t.id]?.[lastP + 1]) score += 35000;
+                    if (dayAssignments[t.id]?.[firstP - 1] || dayAssignments[t.id]?.[lastP + 1]) {score += 35000;}
                     const daySessions = Object.keys(dayAssignments[t.id] || {}).length;
-                    if (daySessions >= 3) score -= 60000;
+                    if (daySessions >= 3) {score -= 60000;}
                   } else {
                     const firstP = pIdxs[0];
                     const lastP = pIdxs[pIdxs.length - 1];
@@ -1048,14 +1842,14 @@ export default function AdminPanel({
                       let minGap = 10;
                       assignedPs.forEach(ps => {
                         const gap = Math.min(Math.abs(firstP - ps), Math.abs(lastP - ps));
-                        if (gap < minGap) minGap = gap;
+                        if (gap < minGap) {minGap = gap;}
                       });
                       score += minGap * 15000; 
                     }
-                    if (dayAssignments[t.id]?.[firstP - 1] || dayAssignments[t.id]?.[lastP + 1]) score -= rules.packing.scatteredGapPenalty;
+                    if (dayAssignments[t.id]?.[firstP - 1] || dayAssignments[t.id]?.[lastP + 1]) {score -= 50000;}
                   }
                 }
-                if (t.homeRoomGrade === entry.grade) score += rules.packing.homeRoomScoreBoost;
+                if (t.homeRoomGrade === entry.grade) {score += 5000;}
                 score += Math.random() * 2000; 
                 return { teacher: t, score };
               })
@@ -1066,27 +1860,27 @@ export default function AdminPanel({
               pIdxs.forEach(p => {
                 const key = role === "STANDBY" ? getAssignmentKey(p, "GRADE", "STANDBY", 0) : getAssignmentKey(p, venueId, "INVIGILATOR", subIdx!);
                 localizedAssignments[entry.id][key] = best.id;
-                if (!dayAssignments[best.id]) dayAssignments[best.id] = {};
+                if (!dayAssignments[best.id]) {dayAssignments[best.id] = {};}
                 dayAssignments[best.id][p] = venueId;
                 const pConf = getPeriodsForDate(dateStr)[p];
                 const durHrs = ((parseTime(pConf.end)) - (parseTime(pConf.start))) / 60;
                 teacherHours[best.id] = (teacherHours[best.id] || 0) + durHrs;
                 teacherHoursInRange[best.id] = (teacherHoursInRange[best.id] || 0) + durHrs;
               });
-              if (role === "STANDBY") standbyCounts[best.id]++;
+              if (role === "STANDBY") {standbyCounts[best.id]++;}
             } else if (dayRepacks >= MAX_DAY_REPACKS * 0.5) {
               const backupCandidate = localTeachers
                 .filter(t => {
                    const tName = `${t.firstName} ${t.lastName}`.toLowerCase();
                    const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
                    const isFranz = t.id === "NORT" || t.id === "FRAN" || tName.includes("franz") || tName.includes("nortje");
-                   if (assignedAsTechToday.has(t.id)) return false;
+                   if (assignedAsTechToday.has(t.id)) {return false;}
                    for (const p of pIdxs) {
-                     if (dayAssignments[t.id]?.[p]) return false;
-                     if (isTeacherOnLeaveAtPeriod(t.id, p, dateStr)) return false;
+                     if (dayAssignments[t.id]?.[p]) {return false;}
+                     if (isTeacherOnLeaveAtPeriod(t.id, p, dateStr)) {return false;}
                    }
                    if (dayRepacks < MAX_DAY_REPACKS * 0.95) {
-                     if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz)) return false;
+                     if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz)) {return false;}
                    }
                    return true;
                 })
@@ -1096,14 +1890,14 @@ export default function AdminPanel({
                 pIdxs.forEach(p => {
                   const key = role === "STANDBY" ? getAssignmentKey(p, "GRADE", "STANDBY", 0) : getAssignmentKey(p, venueId, "INVIGILATOR", subIdx!);
                   localizedAssignments[entry.id][key] = backupCandidate.id;
-                  if (!dayAssignments[backupCandidate.id]) dayAssignments[backupCandidate.id] = {};
+                  if (!dayAssignments[backupCandidate.id]) {dayAssignments[backupCandidate.id] = {};}
                   dayAssignments[backupCandidate.id][p] = venueId;
                   const pConf = getPeriodsForDate(dateStr)[p];
                   const durHrs = (parseTime(pConf.end) - parseTime(pConf.start)) / 60;
                   teacherHours[backupCandidate.id] = (teacherHours[backupCandidate.id] || 0) + durHrs;
                   teacherHoursInRange[backupCandidate.id] = (teacherHoursInRange[backupCandidate.id] || 0) + durHrs;
                 });
-                if (role === "STANDBY") standbyCounts[backupCandidate.id]++;
+                if (role === "STANDBY") {standbyCounts[backupCandidate.id]++;}
               } else {
                 dayFailed = true;
                 break;
@@ -1266,15 +2060,15 @@ export default function AdminPanel({
         const map: Record<string, Record<string, number>> = {};
         localTeachers.forEach(t => map[t.id] = {});
         ents.forEach(e => {
-          if (!e.invigilatorAssignments) return;
+          if (!e.invigilatorAssignments) {return;}
           Object.entries(e.invigilatorAssignments).forEach(([key, tid]) => {
-            if (!map[tid]) return;
+            if (!map[tid]) {return;}
             const vId = key.split("_")[1];
             const role = key.split("_")[2];
             const isStandby = vId === "GRADE" || role === "STANDBY";
-            if (!isStandby && e.venueIds && !e.venueIds.includes(vId)) return;
+            if (!isStandby && e.venueIds && !e.venueIds.includes(vId)) {return;}
 
-            if (!map[tid][e.date]) map[tid][e.date] = 0;
+            if (!map[tid][e.date]) {map[tid][e.date] = 0;}
             map[tid][e.date]++;
           });
         });
@@ -1282,38 +2076,38 @@ export default function AdminPanel({
       };
 
       const isTeacherEligibleForEqualizeSlot = (t: Teacher, entry: TimetableEntry, pIdx: number, role: string, venueId: string, passLimit: number, respectRestricted: boolean, currentEntries: TimetableEntry[], tIdToAvoid?: string, sessionsMap?: Record<string, Record<string, number>>) => {
-        if (t.invigilationPreference === "OPS") return false;
-        if (tIdToAvoid && t.id === tIdToAvoid) return false;
+        if (t.invigilationPreference === "OPS") {return false;}
+        if (tIdToAvoid && t.id === tIdToAvoid) {return false;}
         const dateStr = entry.date;
         
-        if (t.hasReward && rewardDays[t.id] === dateStr && passLimit < 20) return false;
+        if (t.hasReward && rewardDays[t.id] === dateStr && passLimit < 20) {return false;}
 
         const eDate = parseISO(dateStr);
         const sCounts = (sessionsMap || getSessionsOnDayMap(currentEntries))[t.id] || {};
         const sessions = sCounts[dateStr] || 0;
         
-        if (sessions >= passLimit) return false;
+        if (sessions >= passLimit) {return false;}
 
         const isAfterJune1 = !isBefore(eDate, parseISO("2026-06-01"));
         if (!isAfterJune1) {
           const isWriting = writingGradesByDate[dateStr]?.some(grade => 
              isAssignedToGradeInPeriod(t, grade, pIdx, dateStr)
           );
-          if (!isWriting) return false;
+          if (!isWriting) {return false;}
         }
 
         const isWednesdayFirst = isWednesday(eDate) && pIdx === 0;
         if (isWednesdayFirst) {
           if (t.homeRoomGrade) {
-            if (t.homeRoomGrade !== entry.grade) return false;
+            if (t.homeRoomGrade !== entry.grade) {return false;}
           } else {
-            if (entry.grade !== 12) return false;
+            if (entry.grade !== 12) {return false;}
           }
         }
 
         if (t.id === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
             const isArtTech = entry.subject.toLowerCase().includes("visual art") && (role === "TECH" || role === "TECHNICAL");
-            if (!isArtTech) return false;
+            if (!isArtTech) {return false;}
         }
 
         if (t.id === "SHEH" && role === "STANDBY" && passLimit < 20) {
@@ -1324,20 +2118,20 @@ export default function AdminPanel({
         currentEntries.forEach(e2 => {
           if (e2.date === dateStr && e2.invigilatorAssignments) {
             Object.entries(e2.invigilatorAssignments).forEach(([k, tid]) => {
-              if (k.split("_")[1] !== "GRADE" && e2.venueIds && !e2.venueIds.includes(k.split("_")[1])) return;
-              if (k.includes("_TECH") || k.includes("_TECHNICAL")) techTidsToday.add(tid);
+              if (k.split("_")[1] !== "GRADE" && e2.venueIds && !e2.venueIds.includes(k.split("_")[1])) {return;}
+              if (k.includes("_TECH") || k.includes("_TECHNICAL")) {techTidsToday.add(tid);}
             });
           }
         });
 
-        if (techTidsToday.has(t.id) && !(role === "TECH" || role === "TECHNICAL")) return false;
-        if ((role === "TECH" || role === "TECHNICAL") && !isTechnicalStaffEligible(t, entry.subject)) return false;
+        if (techTidsToday.has(t.id) && !(role === "TECH" || role === "TECHNICAL")) {return false;}
+        if ((role === "TECH" || role === "TECHNICAL") && !isTechnicalStaffEligible(t, entry.subject)) {return false;}
 
         const s = entry.subject.toLowerCase();
         const isLS = s.includes("life science");
         const isPrac = entry.paperType === "Prac";
         if (isLS && isPrac && (role === "TECH" || role === "TECHNICAL")) {
-          if (rules.equalize.techSpecialistOnlyForPrac && !isLSSpecialistTeacher(t)) return false;
+          if (!isLSSpecialistTeacher(t)) {return false;}
         }
 
         const hasHallPass = t.hallPass === true;
@@ -1345,8 +2139,7 @@ export default function AdminPanel({
           const isG12 = entry.grade === 12;
           const venue = venues.find(v => v.id === venueId);
           const isHall = venue?.name?.toLowerCase().includes("hall") || venue?.name?.toLowerCase().includes("assembly hall") || venue?.type === "Hall";
-          if (rules.equalize.hallPassRequiredForG12 && isG12) return false;
-          if (rules.equalize.hallPassRequiredForHall && isHall) return false;
+          if (isG12 || isHall) {return false;}
         }
 
         if (role !== "TECH" && role !== "TECHNICAL" && role !== "STANDBY" && passLimit < 10) {
@@ -1356,7 +2149,7 @@ export default function AdminPanel({
               Object.entries(e.invigilatorAssignments).forEach(([k, tid]) => {
                 if (tid === t.id) {
                   const match = k.match(/(\d+)/);
-                  if (match) assignmentsToday.push(parseInt(match[1]));
+                  if (match) {assignmentsToday.push(parseInt(match[1]));}
                 }
               });
             }
@@ -1364,10 +2157,10 @@ export default function AdminPanel({
           
           if (t.invigilationPreference === "SCATTERED") {
             const isAdjacent = assignmentsToday.some(p => Math.abs(p - pIdx) === 1);
-            if (isAdjacent) return false;
+            if (isAdjacent) {return false;}
           } else if (t.invigilationPreference === "MARATHON" && assignmentsToday.length > 0) {
             const isAdjacent = assignmentsToday.some(p => Math.abs(p - pIdx) === 1);
-            if (!isAdjacent && passLimit < 15) return false; 
+            if (!isAdjacent && passLimit < 15) {return false;} 
           }
         }
 
@@ -1376,7 +2169,7 @@ export default function AdminPanel({
               e2.date === dateStr && e2.session === entry.session && e2.invigilatorAssignments &&
               Object.entries(e2.invigilatorAssignments).some(([k, tid]) => tid === t.id && !(k.includes("_TECH") || k.includes("_TECHNICAL")))
             );
-            if (hasOtherInThisSession) return false;
+            if (hasOtherInThisSession) {return false;}
         }
 
         const isOccupied = currentEntries.some(e => 
@@ -1386,16 +2179,16 @@ export default function AdminPanel({
              tid === t.id && parseInt(k.match(/(\d+)/)?.[1] || "-1") === pIdx
           )
         );
-        if (isOccupied || isTeacherOnLeaveAtPeriod(t.id, pIdx, dateStr)) return false;
-        if (respectRestricted && isTeacherRestricted(t, entry.subject || "")) return false;
+        if (isOccupied || isTeacherOnLeaveAtPeriod(t.id, pIdx, dateStr)) {return false;}
+        if (respectRestricted && isTeacherRestricted(t, entry.subject || "")) {return false;}
 
-        if (entry.session === "AFTERNOON" && t.afternoonDutyDates?.includes(dateStr)) return false;
+        if (entry.session === "AFTERNOON" && t.afternoonDutyDates?.includes(dateStr)) {return false;}
         
         return true;
       };
 
-      let entriesByDate = localEntries.reduce((acc, e) => {
-          if (!acc[e.date]) acc[e.date] = [];
+      const entriesByDate = localEntries.reduce((acc, e) => {
+          if (!acc[e.date]) {acc[e.date] = [];}
           acc[e.date].push(e);
           return acc;
         }, {} as Record<string, TimetableEntry[]>);
@@ -1405,17 +2198,22 @@ export default function AdminPanel({
         const currentAssignedMinutes: Record<string, number> = {};
         teachers.forEach(t => currentAssignedMinutes[t.id] = workloadStats?.assignedMinutes?.[t.id] || 0);
 
-        const passes = rules.equalize.passes;
+        // Basic implementation to satisfy the call and requirements
+        const passes = [
+          { limit: 3, respectRestricted: true },
+          { limit: 4, respectRestricted: true },
+          { limit: 3, respectRestricted: false }
+        ];
 
         for (let passIdx = 0; passIdx < passes.length; passIdx++) {
             const pass = passes[passIdx];
             for (const day of daysInRange) {
                 const dateStr = format(day, "yyyy-MM-dd");
                 const dayEntriesForDate = localEntries.filter(e => e.date === dateStr);
-                if (dayEntriesForDate.length === 0) continue;
+                if (dayEntriesForDate.length === 0) {continue;}
 
                 for (const entry of dayEntriesForDate) {
-                    if (!entry.invigilatorAssignments) entry.invigilatorAssignments = {};
+                    if (!entry.invigilatorAssignments) {entry.invigilatorAssignments = {};}
                     const relevantPIdxs = getRelevantPeriodsIdx(entry.session, entry.durationMinutes || 180, entry);
                     const assignedVenues = venues.filter(v => entry.venueIds?.includes(v.id));
 
@@ -1451,10 +2249,10 @@ export default function AdminPanel({
       setEqProgress(25);
       
       localEntries.forEach(e => {
-        if (!e.invigilatorAssignments) return;
+        if (!e.invigilatorAssignments) {return;}
         const dateStr = e.date;
         const eDate = parseISO(dateStr);
-        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) return;
+        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) {return;}
 
         Object.entries(e.invigilatorAssignments).forEach(([key, tid]) => {
            const t = teachers.find(tx => tx.id === tid);
@@ -1521,8 +2319,8 @@ export default function AdminPanel({
             e.venueIds.forEach(vId => {
                 pIdxs.forEach(p => {
                     const k = getAssignmentKey(p, vId, "TECH", 0);
-                    if (vId === "IT_LAB") e.invigilatorAssignments![k] = "FRAN";
-                    if (vId === "CAT_LAB") e.invigilatorAssignments![k] = "JACB";
+                    if (vId === "IT_LAB") {e.invigilatorAssignments![k] = "FRAN";}
+                    if (vId === "CAT_LAB") {e.invigilatorAssignments![k] = "JACB";}
                 });
             });
         } else if ((isIT || isCAT) && isP2) {
@@ -1535,16 +2333,16 @@ export default function AdminPanel({
       });
 
       localEntries.forEach(e => {
-        if (!e.invigilatorAssignments) return;
+        if (!e.invigilatorAssignments) {return;}
         const dateStr = e.date;
         const eDate = parseISO(dateStr);
-        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) return;
+        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) {return;}
 
         const techTidsInSession = new Set();
         localEntries.filter(e2 => e2.date === dateStr && e2.session === e.session).forEach(e2 => {
-          if (!e2.invigilatorAssignments) return;
+          if (!e2.invigilatorAssignments) {return;}
           Object.entries(e2.invigilatorAssignments).forEach(([k, tid]) => {
-            if (k.includes("_TECH") || k.includes("_TECHNICAL")) techTidsInSession.add(tid);
+            if (k.includes("_TECH") || k.includes("_TECHNICAL")) {techTidsInSession.add(tid);}
           });
         });
 
@@ -1574,23 +2372,23 @@ export default function AdminPanel({
       [tId: string]: { [date: string]: { [pIdx: number]: Set<string> } };
     } = {};
     entries.forEach((entry) => {
-      if (!entry.invigilatorAssignments) return;
+      if (!entry.invigilatorAssignments) {return;}
       const date = entry.date;
       Object.entries(entry.invigilatorAssignments).forEach(([key, tId]) => {
-        if (!tId) return;
+        if (!tId) {return;}
         const match = key.match(/(\d+)/);
-        if (!match) return;
+        if (!match) {return;}
         const pIdx = parseInt(match[1]);
         
         const parts = key.split("_");
         const venueId = parts[1];
         const role = parts[2];
 
-        if (venueId !== "GRADE" && !entry.venueIds?.includes(venueId)) return;
+        if (venueId !== "GRADE" && !entry.venueIds?.includes(venueId)) {return;}
 
-        if (!map[tId]) map[tId] = {};
-        if (!map[tId][date]) map[tId][date] = {};
-        if (!map[tId][date][pIdx]) map[tId][date][pIdx] = new Set();
+        if (!map[tId]) {map[tId] = {};}
+        if (!map[tId][date]) {map[tId][date] = {};}
+        if (!map[tId][date][pIdx]) {map[tId][date][pIdx] = new Set();}
         
         const assignmentSignature = role === "STANDBY" ? "STANDBY" : `${venueId}_${role}`;
         map[tId][date][pIdx].add(assignmentSignature);
@@ -1602,7 +2400,7 @@ export default function AdminPanel({
   const writingGradesByDate = useMemo(() => {
     const map: { [date: string]: number[] } = {};
     entries.forEach((e) => {
-      if (!map[e.date]) map[e.date] = [];
+      if (!map[e.date]) {map[e.date] = [];}
       if (!map[e.date].includes(e.grade)) {
         map[e.date].push(e.grade);
       }
@@ -1641,7 +2439,7 @@ export default function AdminPanel({
       const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
 
       if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz) || isMerike)
-        return;
+        {return;}
 
       assignedMinutes[t.id] = 0;
       teacherBreakdown[t.id] = { morning: 0, afternoon: 0, tech: 0, standby: 0 };
@@ -1656,11 +2454,11 @@ export default function AdminPanel({
     entries.forEach((entry) => {
       const datePeriods = (() => {
         const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-        if (dateConfig) return dateConfig.periods;
+        if (dateConfig) {return dateConfig.periods;}
         const d = parseISO(entry.date);
         const dayName = format(d, "EEEE");
         const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-        if (dayConfig) return dayConfig.periods;
+        if (dayConfig) {return dayConfig.periods;}
         return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
       })();
 
@@ -1697,7 +2495,7 @@ export default function AdminPanel({
         const pDuration = h2 * 60 + m2 - (h1 * 60 + m1);
 
         assignedVenueObjs.forEach((venue) => {
-          if (!venue) return;
+          if (!venue) {return;}
           const isHall =
             venue.name?.toLowerCase().includes("hall") || venue.type === "Hall";
           const isG12 = entry.grade === 12;
@@ -1719,8 +2517,8 @@ export default function AdminPanel({
             const tid = entry.invigilatorAssignments?.[key];
             if (tid && assignedMinutes[tid] !== undefined) {
               assignedMinutes[tid] += pDuration;
-              if (entry.session === "MORNING") teacherBreakdown[tid].morning += pDuration;
-              else teacherBreakdown[tid].afternoon += pDuration;
+              if (entry.session === "MORNING") {teacherBreakdown[tid].morning += pDuration;}
+              else {teacherBreakdown[tid].afternoon += pDuration;}
             }
           }
           if (isPrac) {
@@ -1751,7 +2549,7 @@ export default function AdminPanel({
     Object.values(conflictMap).forEach((dayMap) => {
       Object.values(dayMap).forEach((pMap) => {
         Object.values(pMap).forEach((ids) => {
-          if ((ids as string[]).length > 1) totalConflicts++;
+          if ((ids as string[]).length > 1) {totalConflicts++;}
         });
       });
     });
@@ -1821,15 +2619,15 @@ export default function AdminPanel({
       .sort((a, b) => {
         // 1. Date (asc)
         const dComp = a.date.localeCompare(b.date);
-        if (dComp !== 0) return dComp;
+        if (dComp !== 0) {return dComp;}
         // 2. Grade (desc - usually 12 down to 8)
-        if (a.grade !== b.grade) return b.grade - a.grade;
+        if (a.grade !== b.grade) {return b.grade - a.grade;}
         // 3. Subject (asc)
         const sComp = a.subject.localeCompare(b.subject);
-        if (sComp !== 0) return sComp;
+        if (sComp !== 0) {return sComp;}
         // 4. Venue (asc)
         const vComp = a.venueName.localeCompare(b.venueName);
-        if (vComp !== 0) return vComp;
+        if (vComp !== 0) {return vComp;}
         // 5. Period Start Time (asc)
         return a.periodStartTime.localeCompare(b.periodStartTime);
       })
@@ -1878,7 +2676,7 @@ export default function AdminPanel({
       .map(e => e.updatedAt)
       .filter(Boolean)
       .map(d => parseISO(d as string).getTime());
-    if (dates.length === 0) return null;
+    if (dates.length === 0) {return null;}
     return new Date(Math.max(...dates));
   }, [entries]);
   const [timetableDate, setTimetableDate] = useState<string>(
@@ -1897,6 +2695,8 @@ export default function AdminPanel({
   const [selectedTeacherForHomeRoom, setSelectedTeacherForHomeRoom] =
     useState<Teacher | null>(null);
   const [selectedInspectionTeacherId, setSelectedInspectionTeacherId] = useState<string>("");
+  const [inspectionView, setInspectionView] = useState<"TABLE" | "CALENDAR">("TABLE");
+  const [selectedInspectionDate, setSelectedInspectionDate] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [bootstrapStatus, setBootstrapStatus] = useState<
     "IDLE" | "LOADING" | "SUCCESS" | "ERROR"
@@ -1915,7 +2715,7 @@ export default function AdminPanel({
       currentPeriodIdx === null ||
       currentPeriodIdx === -1
     )
-      return null;
+      {return null;}
     const cycleKey = currentCycle === 1 ? "cycle1" : "cycle2";
     const grade =
       t.timetable[cycleKey][currentDayIdx.toString()]?.[currentPeriodIdx];
@@ -1946,31 +2746,32 @@ export default function AdminPanel({
     },
     {
       label: "Total Hours",
-      value: `${teachers.reduce((acc, t) => acc + (t.totalHours || 0), 0)}h`,
+      value: `${teachers.reduce((acc, t) => acc + (t.totalHours || 0), 0).toFixed(2)}h`,
       icon: ArrowUpRight,
       color: "text-curro-red",
       bg: "bg-red-50",
     },
   ];
 
-  const handleRemoveTeacher = async (teacher: Teacher) => {
-    if (
-      !confirm(
-        `Are you sure you want to remove ${teacher.firstName} ${teacher.lastName}?`,
-      )
-    )
-      return;
-    setIsSaving(true);
-    try {
-      // If it's a real user with a UID, we delete by UID
-      // If it's a pending profile, we delete by its ID (which might be the staff code)
-      const targetId = teacher.uid || teacher.id;
-      await deleteDoc(doc(db, "users", targetId));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `users/${teacher.id}`);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleRemoveTeacher = (teacher: Teacher) => {
+    setConfirmState({
+      open: true,
+      title: "Remove teacher",
+      message: `Are you sure you want to remove ${teacher.firstName} ${teacher.lastName}?`,
+      variant: "destructive",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        setIsSaving(true);
+        try {
+          const targetId = teacher.uid || teacher.id;
+          await deleteDoc(doc(db, "users", targetId));
+        } catch (error) {
+          handleFirestoreError(error, OperationType.DELETE, `users/${teacher.id}`);
+        } finally {
+          setIsSaving(false);
+        }
+      },
+    });
   };
 
   const bootstrapFaculty = async () => {
@@ -2004,7 +2805,7 @@ export default function AdminPanel({
     setIsSaving(true);
     try {
       const teacher = teachers.find((t) => t.id === teacherId);
-      if (!teacher) return;
+      if (!teacher) {return;}
       const targetId = teacher.uid || teacher.id;
       const teacherRef = doc(db, "users", targetId);
       await updateDoc(teacherRef, updates);
@@ -2036,6 +2837,25 @@ export default function AdminPanel({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {onToggleWideLayout && (
+            <button
+              onClick={onToggleWideLayout}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black border transition-all shadow-sm ${
+                wideLayout
+                  ? "bg-curro-blue text-white border-curro-blue hover:bg-curro-blue/90"
+                  : "bg-white text-text-dark border-gray-200 hover:bg-gray-50"
+              }`}
+              title={wideLayout ? "Exit wide layout" : "Use full screen width"}
+              aria-pressed={wideLayout}
+            >
+              {wideLayout ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+              {wideLayout ? "EXIT WIDE" : "WIDE"}
+            </button>
+          )}
           {bootstrapStatus === "SUCCESS" ? (
             <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-black border border-emerald-100">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -2126,57 +2946,34 @@ export default function AdminPanel({
       </div>
 
       {/* Tab Switcher */}
-      <div className="flex flex-wrap items-center p-1 bg-white border border-gray-100 rounded-2xl w-fit shadow-sm gap-1">
-        <button
-          onClick={() => setActiveTab("SUBJECTS")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "SUBJECTS" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <BookOpen className="w-4 h-4" />
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+        aria-label="Admin sections"
+        className="flex-wrap p-1 bg-white border border-gray-100 rounded-2xl w-fit shadow-sm"
+      >
+        <TabButton value="SUBJECTS" icon={<BookOpen className="w-4 h-4" />}>
           Subjects
-        </button>
-        <button
-          onClick={() => setActiveTab("FACULTY")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "FACULTY" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <Users className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="FACULTY" icon={<Users className="w-4 h-4" />}>
           Faculty
-        </button>
-        <button
-          onClick={() => setActiveTab("TIMETABLE")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "TIMETABLE" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <CalendarRange className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="TIMETABLE" icon={<CalendarRange className="w-4 h-4" />}>
           Exam Time Table
-        </button>
-        <button
-          onClick={() => setActiveTab("VENUES")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "VENUES" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <MapPin className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="VENUES" icon={<MapPin className="w-4 h-4" />}>
           Venues
-        </button>
-        <button
-          onClick={() => setActiveTab("SCHEDULER")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "SCHEDULER" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <ClipboardCheck className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="SCHEDULER" icon={<ClipboardCheck className="w-4 h-4" />}>
           Scheduler
-        </button>
-        <button
-          onClick={() => setActiveTab("ASSIGNMENTS")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "ASSIGNMENTS" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <ClipboardCheck className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="ASSIGNMENTS" icon={<ClipboardCheck className="w-4 h-4" />}>
           Assignments
-        </button>
-        <button
-          onClick={() => setActiveTab("INSPECTION")}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === "INSPECTION" ? "bg-curro-blue text-white shadow-lg scale-105" : "text-text-muted hover:bg-gray-50"}`}
-        >
-          <Search className="w-4 h-4" />
+        </TabButton>
+        <TabButton value="INSPECTION" icon={<Search className="w-4 h-4" />}>
           Inspection
-        </button>
-      </div>
+        </TabButton>
+      </Tabs>
 
       <div className="min-h-[600px]">
         {activeTab === "SUBJECTS" && (
@@ -2191,7 +2988,7 @@ export default function AdminPanel({
         {activeTab === "FACULTY" && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Left Column: Teachers List */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col h-[650px] overflow-hidden">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col h-[calc(100vh-14rem)] min-h-[600px] overflow-hidden">
               <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                 <div className="flex items-center gap-3">
                   <h3 className="font-black text-text-dark uppercase tracking-tight text-xs flex items-center gap-2">
@@ -2296,295 +3093,53 @@ export default function AdminPanel({
                   .sort((a, b) => {
                     const lastA = a.lastName.toLowerCase();
                     const lastB = b.lastName.toLowerCase();
-                    if (lastA < lastB) return -1;
-                    if (lastA > lastB) return 1;
+                    if (lastA < lastB) {return -1;}
+                    if (lastA > lastB) {return 1;}
 
                     const firstA = a.firstName.toLowerCase();
                     const firstB = b.firstName.toLowerCase();
-                    if (firstA < firstB) return -1;
-                    if (firstA > firstB) return 1;
+                    if (firstA < firstB) {return -1;}
+                    if (firstA > firstB) {return 1;}
                     return 0;
                   })
                   .map((t) => {
                     const hasPendingLeave = leaveRequests.some(
                       (l) => l.teacherId === t.id && l.status === "PENDING",
                     );
-
+                    const target = Math.round(
+                      (t.workloadPercentage ?? 100) * workloadStats.minsPerUnit,
+                    );
+                    const breakdown = workloadStats.breakdown[t.id] || {
+                      morning: 0,
+                      afternoon: 0,
+                      tech: 0,
+                      standby: 0,
+                    };
                     return (
-                      <div
+                      <FacultyRow
                         key={t.id}
-                        className={`w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group ${hasPendingLeave ? "bg-yellow-100 border-l-4 border-yellow-400" : ""}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-bg-gray text-curro-blue flex items-center justify-center font-black text-sm group-hover:bg-curro-blue group-hover:text-white transition-all scale-95 group-hover:scale-100">
-                            {t.lastName[0]}
-                          </div>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-bold text-text-dark leading-tight">
-                                {t.firstName} {t.lastName}
-                              </span>
-                              <button
-                                onClick={() => handleUpdateTeacher(t.id, { hasReward: !t.hasReward })}
-                                className={`p-1.5 rounded-lg transition-all ${t.hasReward ? "bg-amber-100 text-amber-600 shadow-sm ring-1 ring-amber-200" : "bg-gray-50 text-gray-400 hover:bg-amber-50 hover:text-amber-400"}`}
-                                title={t.hasReward ? "Reward: Free Day enabled" : "Reward: Disabled"}
-                              >
-                                <motion.div animate={{ rotate: t.hasReward ? [0, 15, -15, 0] : 0 }} transition={{ repeat: t.hasReward ? Infinity : 0, duration: 2 }}>
-                                  <Gift className={`w-3.5 h-3.5 ${t.hasReward ? "fill-current" : ""}`} />
-                                </motion.div>
-                              </button>
-                              {t.invigilationPreference === "OPS" && (
-                                <span className="bg-purple-100 text-purple-700 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-purple-200">
-                                  Operational Manager (No Duty)
-                                </span>
-                              )}
-                              {getTeacherStatus(t) && (
-                                <div className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border border-emerald-100">
-                                  <Circle className="w-1.5 h-1.5 fill-current animate-pulse" />
-                                  Teaching Gr {getTeacherStatus(t)}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className="text-[9px] font-black text-text-muted uppercase tracking-tighter bg-gray-100 px-1 rounded">
-                                {t.id} STAFF
-                              </span>
-                              {t.email && (
-                                <span className="text-[9px] font-medium text-curro-blue bg-blue-50 px-1 rounded truncate max-w-[120px]">
-                                  {t.email}
-                                </span>
-                              )}
-                              {t.subjects && t.subjects.length > 0 && (
-                                <span className="text-[9px] font-bold text-curro-blue uppercase tracking-tighter">
-                                  {t.subjects[0].code}
-                                  {t.subjects.length > 1
-                                    ? ` +${t.subjects.length - 1}`
-                                    : ""}
-                                </span>
-                              )}
-                              {t.homeRoomGrade && (
-                                <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-1 rounded">
-                                  HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
-                                </span>
-                              )}
-                              {t.hallPass && (
-                                <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1 rounded flex items-center gap-0.5">
-                                  <ShieldCheck className="w-2 h-2" />
-                                  HALL PASS
-                                </span>
-                              )}
-                              <span className={`text-[9px] font-black px-1 rounded ${t.invigilationPreference === 'MARATHON' ? 'bg-orange-100 text-orange-700' : t.invigilationPreference === 'SCATTERED' ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-600'}`}>
-                                {t.invigilationPreference || 'SCATTERED'}
-                              </span>
-                              {(t.breakDutyDates?.length || 0) > 0 && (
-                                <span className="text-[9px] font-black text-rose-600 bg-rose-50 px-1 rounded flex items-center gap-0.5">
-                                  <Coffee className="w-2 h-2" />
-                                  BD: {t.breakDutyDates?.length}
-                                </span>
-                              )}
-                              {(t.afternoonDutyDates?.length || 0) > 0 && (
-                                <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-1 rounded flex items-center gap-0.5">
-                                  <Clock3 className="w-2 h-2" />
-                                  AD: {t.afternoonDutyDates?.length}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                         <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => {
-                              let next: 'SCATTERED' | 'MARATHON' | 'OPS' = "SCATTERED";
-                              if (t.invigilationPreference === "SCATTERED") next = "MARATHON";
-                              else if (t.invigilationPreference === "MARATHON") next = "OPS";
-                              else next = "SCATTERED";
-                              
-                              const updates: any = { invigilationPreference: next };
-                              if (next === "OPS") {
-                                updates.workloadPercentage = 0;
-                                updates.canInvigilate = false;
-                                updates.hallPass = false;
-                              } else {
-                                if (t.invigilationPreference === "OPS") {
-                                  // coming back from OPS
-                                  updates.workloadPercentage = 100;
-                                  updates.canInvigilate = true;
-                                }
-                              }
-                              handleUpdateTeacher(t.id, updates);
-                            }}
-                            className={`p-2 rounded-lg transition-all flex items-center gap-2 group/pref ${
-                              t.invigilationPreference === "MARATHON"
-                                ? "bg-emerald-50 text-emerald-600"
-                                : t.invigilationPreference === "OPS"
-                                ? "bg-purple-50 text-purple-600"
-                                : "bg-cyan-50 text-cyan-600"
-                            }`}
-                            title={
-                              t.invigilationPreference === "MARATHON"
-                                ? "Preference: Marathon"
-                                : t.invigilationPreference === "OPS"
-                                ? "Preference: OPS (No Duty)"
-                                : "Preference: Scattered"
-                            }
-                          >
-                            {t.invigilationPreference === "MARATHON" ? (
-                              <Clock3 className="w-4 h-4" />
-                            ) : t.invigilationPreference === "OPS" ? (
-                              <ShieldCheck className="w-4 h-4" />
-                            ) : (
-                              <Zap className="w-4 h-4" />
-                            )}
-                            <span className="text-[10px] font-black uppercase tracking-tighter hidden md:inline">
-                              {t.invigilationPreference || "SCATTERED"}
-                            </span>
-                          </button>
-                          <div className="w-px h-6 bg-gray-100 mx-1" />
-                          <button
-                            onClick={() => {
-                              const isMerike = (t.firstName.toLowerCase().includes("merike") && t.lastName.toLowerCase().includes("van dyk"));
-                              const currentVal = t.hallPass ?? !isMerike;
-                              handleUpdateTeacher(t.id, { hallPass: !currentVal });
-                            }}
-                            className={`p-2 rounded-lg transition-all flex items-center gap-2 group/hall ${
-                              (t.hallPass ?? !(t.firstName.toLowerCase().includes("merike") && t.lastName.toLowerCase().includes("van dyk")))
-                                ? "bg-blue-50 text-curro-blue"
-                                : "bg-red-50 text-curro-red"
-                            }`}
-                            title={(t.hallPass ?? !(t.firstName.toLowerCase().includes("merike") && t.lastName.toLowerCase().includes("van dyk"))) ? "Hall Pass: Active" : "Hall Pass: Restricted"}
-                          >
-                            {(t.hallPass ?? !(t.firstName.toLowerCase().includes("merike") && t.lastName.toLowerCase().includes("van dyk"))) ? (
-                              <ShieldCheck className="w-4 h-4" />
-                            ) : (
-                              <ShieldAlert className="w-4 h-4" />
-                            )}
-                            <span className="text-[10px] font-black uppercase tracking-tighter hidden md:inline">
-                              {(t.hallPass ?? !(t.firstName.toLowerCase().includes("merike") && t.lastName.toLowerCase().includes("van dyk"))) ? "Hall Access" : "Restricted"}
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleUpdateTeacher(t.id, { hasReward: !t.hasReward });
-                            }}
-                            className={`p-2 rounded-lg transition-all flex items-center gap-2 group/reward ${
-                              t.hasReward
-                                ? "bg-amber-50 text-amber-600"
-                                : "bg-gray-50 text-gray-400"
-                            }`}
-                            title={t.hasReward ? "Reward active: 1 Free Day requested" : "No Reward active"}
-                          >
-                            <Trophy className={`w-4 h-4 ${t.hasReward ? "fill-amber-500 text-amber-600 shadow-sm" : ""}`} />
-                            {t.hasReward && (
-                              <span className="text-[9px] font-black uppercase tracking-tighter hidden md:inline">
-                                Reward
-                              </span>
-                            )}
-                          </button>
-                          <div className="w-px h-6 bg-gray-100 mx-1" />
-                          <button
-                            onClick={() => setSelectedTeacherForBreakDuty(t)}
-                            className={`p-2 rounded-lg transition-colors group/btn ${t.breakDutyDates?.some((d) => isSameDay(parseISO(d), startOfToday())) ? "bg-amber-100 text-amber-600" : "hover:bg-amber-50 text-text-muted hover:text-amber-600"}`}
-                            title="Break Duty Dates"
-                          >
-                            <Coffee className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTeacherForHomeRoom(t)}
-                            className={`p-2 rounded-lg transition-colors group/btn ${t.homeRoomGrade ? "bg-indigo-100 text-indigo-600" : "hover:bg-indigo-50 text-text-muted hover:text-indigo-600"}`}
-                            title="Home Room Class"
-                          >
-                            <Home className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTeacherForLeave(t)}
-                            className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors group/btn"
-                            title="Schedule Leave"
-                          >
-                            <CalendarOff className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTeacherForSubjects(t)}
-                            className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors group/btn"
-                            title="Manage Subjects"
-                          >
-                            <BookOpen className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTeacherForTimetable(t)}
-                            className="p-2 hover:bg-red-50 text-text-muted hover:text-curro-red rounded-lg transition-colors group/btn"
-                            title="Edit Timetable"
-                          >
-                            <Calendar className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedTeacherForEdit(t)}
-                            className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors group/btn"
-                            title="Edit Profile"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveTeacher(t)}
-                            className="p-2 hover:bg-red-50 text-text-muted hover:text-red-600 rounded-lg transition-colors group/btn"
-                            title="Remove Staff"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <div className="w-px h-12 bg-gray-100 mx-2" />
-                          <div className="flex flex-col items-end min-w-[200px]">
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span className="text-[9px] font-black text-text-muted uppercase tracking-widest leading-none mb-1">
-                                Workload Distribution (Min)
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[7px] font-black text-text-muted uppercase tracking-tighter">Morn</span>
-                                  <span className="text-[10px] font-bold text-text-dark">{workloadStats.breakdown[t.id]?.morning || 0}</span>
-                                </div>
-                                <div className="w-px h-4 bg-gray-100" />
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[7px] font-black text-text-muted uppercase tracking-tighter">Aft</span>
-                                  <span className="text-[10px] font-bold text-text-dark">{workloadStats.breakdown[t.id]?.afternoon || 0}</span>
-                                </div>
-                                <div className="w-px h-4 bg-gray-100" />
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[7px] font-black text-blue-600 uppercase tracking-tighter">Tech</span>
-                                  <span className="text-[10px] font-bold text-blue-600 font-mono">{workloadStats.breakdown[t.id]?.tech || 0}</span>
-                                </div>
-                                <div className="w-px h-4 bg-gray-100" />
-                                <div className="flex flex-col items-center">
-                                  <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter">StdBy</span>
-                                  <span className="text-[10px] font-bold text-emerald-600">{workloadStats.breakdown[t.id]?.standby || 0}</span>
-                                </div>
-                                <div className="w-px h-6 bg-gray-200 mx-1" />
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[8px] font-black text-text-dark uppercase tracking-widest">Total</span>
-                                  <span className="text-xs font-mono font-black text-curro-blue leading-none">
-                                    {workloadStats.assigned[t.id] || 0} / {Math.round((t.workloadPercentage ?? 100) * workloadStats.minsPerUnit)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 group/load mt-2 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                              <input
-                                type="number"
-                                value={t.workloadPercentage ?? 100}
-                                onChange={(e) =>
-                                  handleUpdateTeacher(t.id, {
-                                    workloadPercentage:
-                                      parseInt(e.target.value) || 0,
-                                  })
-                                }
-                                className="w-8 bg-transparent text-[8px] font-black text-curro-blue text-right focus:outline-none focus:ring-1 focus:ring-curro-blue rounded border-none p-0"
-                              />
-                              <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">
-                                % Weighting
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                        teacher={t}
+                        hasPendingLeave={hasPendingLeave}
+                        currentTeachingGrade={getTeacherStatus(t)}
+                        assigned={workloadStats.assigned[t.id] || 0}
+                        target={target}
+                        breakdown={breakdown}
+                        wideMode={wideLayout}
+                        onUpdate={handleUpdateTeacher}
+                        onBreakDuty={() => setSelectedTeacherForBreakDuty(t)}
+                        onHomeRoom={() => setSelectedTeacherForHomeRoom(t)}
+                        onLeave={() => setSelectedTeacherForLeave(t)}
+                        onSubjects={() => setSelectedTeacherForSubjects(t)}
+                        onTimetable={() => setSelectedTeacherForTimetable(t)}
+                        onEdit={() => setSelectedTeacherForEdit(t)}
+                        onRemove={() => handleRemoveTeacher(t)}
+                        onInspect={() => {
+                          setSelectedInspectionTeacherId(t.id);
+                          setSelectedInspectionDate(null);
+                          setInspectionView("TABLE");
+                          setActiveTab("INSPECTION");
+                        }}
+                      />
                     );
                   })}
               </div>
@@ -2607,7 +3162,7 @@ export default function AdminPanel({
                     Requires Action
                   </span>
                 </div>
-                <div className="max-h-[300px] overflow-y-auto divide-y divide-amber-100">
+                <div className="divide-y divide-amber-100">
                   {leaveRequests
                     .filter((r) => r.status === "PENDING")
                     .sort((a, b) => a.date.localeCompare(b.date))
@@ -2984,15 +3539,15 @@ export default function AdminPanel({
                         .sort((a, b) => {
                           // 1. Date (asc)
                           const dComp = a.date.localeCompare(b.date);
-                          if (dComp !== 0) return dComp;
+                          if (dComp !== 0) {return dComp;}
                           // 2. Grade (desc)
-                          if (a.grade !== b.grade) return b.grade - a.grade;
+                          if (a.grade !== b.grade) {return b.grade - a.grade;}
                           // 3. Subject (asc)
                           const sComp = a.subject.localeCompare(b.subject);
-                          if (sComp !== 0) return sComp;
+                          if (sComp !== 0) {return sComp;}
                           // 4. Venue (asc)
                           const vComp = a.venueName.localeCompare(b.venueName);
-                          if (vComp !== 0) return vComp;
+                          if (vComp !== 0) {return vComp;}
                           // 5. Period Start Time (asc)
                           return a.periodStart.localeCompare(b.periodStart);
                         })
@@ -3021,11 +3576,11 @@ export default function AdminPanel({
                           const isDarkBg = isOPS || isError || isWarning;
 
                           let bgClass = "hover:bg-gray-50/50";
-                          if (isError) bgClass = "bg-red-600 text-white animate-pulse shadow-lg z-10 relative";
-                          else if (isWarning) bgClass = "bg-orange-500 text-white shadow-inner";
-                          else if (isOPS) bgClass = "bg-curro-red text-white";
-                          else if (isScattered) bgClass = "bg-cyan-100/80";
-                          else if (isMarathon) bgClass = "bg-rose-100/80";
+                          if (isError) {bgClass = "bg-red-600 text-white animate-pulse shadow-lg z-10 relative";}
+                          else if (isWarning) {bgClass = "bg-orange-500 text-white shadow-inner";}
+                          else if (isOPS) {bgClass = "bg-curro-red text-white";}
+                          else if (isScattered) {bgClass = "bg-cyan-100/80";}
+                          else if (isMarathon) {bgClass = "bg-rose-100/80";}
 
                           return (
                             <tr key={row.id} className={`${bgClass} transition-all duration-300 border-b border-gray-100/50`}>
@@ -3175,7 +3730,6 @@ export default function AdminPanel({
             getRelevantPeriodsIdx={getRelevantPeriodsIdx}
             hasIncompleteVenues={hasIncompleteVenues}
             hasIncompleteVenuesForSelectedDate={hasIncompleteVenuesForSelectedDate}
-            onOpenRules={() => setIsRulesModalOpen(true)}
           />
         )}
 
@@ -3197,11 +3751,11 @@ export default function AdminPanel({
                   <div className="flex flex-wrap items-center gap-3">
                     {selectedInspectionTeacherId && (() => {
                       const teacher = teachers.find(t => t.id === selectedInspectionTeacherId);
-                      if (!teacher) return null;
+                      if (!teacher) {return null;}
 
                       // Pre-calculate assignments for duplicate check in header
                       const teacherAssignments = entries.flatMap((entry) => {
-                        if (!entry.invigilatorAssignments) return [];
+                        if (!entry.invigilatorAssignments) {return [];}
                         const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
                         const d = parseISO(entry.date);
                         const dayName = format(d, "EEEE");
@@ -3213,7 +3767,7 @@ export default function AdminPanel({
                           .map(([key, _]) => {
                             const pIdx = parseInt(key.split("_")[0]);
                             const period = datePeriods[pIdx] || (datePeriods.length > 0 ? datePeriods[0] : null);
-                            if (!period) return null;
+                            if (!period) {return null;}
                             return { date: entry.date, start: period.start, end: period.end, subject: entry.subject, paperType: entry.paperType, eid: entry.id, key };
                           }).filter(Boolean);
                       });
@@ -3245,36 +3799,42 @@ export default function AdminPanel({
                           
                           {hasDuplicates && (
                             <button
-                              onClick={async () => {
-                                if (!confirm("Remove all exact time/subject duplicates for this teacher?")) return;
-                                setIsSaving(true);
-                                try {
-                                  const toDelete: { eid: string; key: string }[] = [];
-                                  const seenTags = new Set<string>();
-                                  teacherAssignments.forEach(ta => {
-                                    const tag = `${ta!.date}|${ta!.start}|${ta!.end}|${ta!.subject}|${ta!.paperType}`;
-                                    if (seenTags.has(tag)) toDelete.push({ eid: ta!.eid, key: ta!.key });
-                                    else seenTags.add(tag);
-                                  });
-                                  const batch = writeBatch(db);
-                                  const byEntry: { [eid: string]: any } = {};
-                                  for (const item of toDelete) {
-                                    if (!byEntry[item.eid]) {
-                                      const entry = entries.find(e => e.id === item.eid);
-                                      if (entry) byEntry[item.eid] = { ...entry.invigilatorAssignments };
+                              onClick={() => setConfirmState({
+                                open: true,
+                                title: "Remove duplicate assignments",
+                                message: "Remove all exact time/subject duplicates for this teacher?",
+                                variant: "destructive",
+                                confirmLabel: "Remove",
+                                onConfirm: async () => {
+                                  setIsSaving(true);
+                                  try {
+                                    const toDelete: { eid: string; key: string }[] = [];
+                                    const seenTags = new Set<string>();
+                                    teacherAssignments.forEach(ta => {
+                                      const tag = `${ta!.date}|${ta!.start}|${ta!.end}|${ta!.subject}|${ta!.paperType}`;
+                                      if (seenTags.has(tag)) {toDelete.push({ eid: ta!.eid, key: ta!.key });}
+                                      else {seenTags.add(tag);}
+                                    });
+                                    const batch = writeBatch(db);
+                                    const byEntry: { [eid: string]: any } = {};
+                                    for (const item of toDelete) {
+                                      if (!byEntry[item.eid]) {
+                                        const entry = entries.find(e => e.id === item.eid);
+                                        if (entry) {byEntry[item.eid] = { ...entry.invigilatorAssignments };}
+                                      }
+                                      if (byEntry[item.eid]) {delete byEntry[item.eid][item.key];}
                                     }
-                                    if (byEntry[item.eid]) delete byEntry[item.eid][item.key];
+                                    for (const [eid, newAss] of Object.entries(byEntry)) {
+                                      batch.update(doc(db, "entries", eid), { invigilatorAssignments: newAss });
+                                    }
+                                    await batch.commit();
+                                  } catch (err) {
+                                    handleFirestoreError(err, OperationType.UPDATE, "entries");
+                                  } finally {
+                                    setIsSaving(false);
                                   }
-                                  for (const [eid, newAss] of Object.entries(byEntry)) {
-                                    batch.update(doc(db, "entries", eid), { invigilatorAssignments: newAss });
-                                  }
-                                  await batch.commit();
-                                } catch (err) {
-                                  handleFirestoreError(err, OperationType.UPDATE, "entries");
-                                } finally {
-                                  setIsSaving(false);
-                                }
-                              }}
+                                },
+                              })}
                               className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-widest rounded shadow-sm flex items-center gap-1 transition-all"
                             >
                               <Trash2 className="w-3 h-3" /> Remove Duplicates
@@ -3297,6 +3857,46 @@ export default function AdminPanel({
                           </option>
                         ))}
                     </select>
+                    {selectedInspectionTeacherId && (
+                      <div className="flex items-center gap-1 bg-white/10 border border-white/20 rounded-xl p-1">
+                        <button
+                          onClick={() => setInspectionView("TABLE")}
+                          className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
+                            inspectionView === "TABLE"
+                              ? "bg-white text-curro-blue shadow"
+                              : "text-white/80 hover:text-white"
+                          }`}
+                          title="Table view"
+                        >
+                          <ClipboardCheck className="w-3 h-3" /> Table
+                        </button>
+                        <button
+                          onClick={() => {
+                            setInspectionView("CALENDAR");
+                            setSelectedInspectionDate(null);
+                          }}
+                          className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
+                            inspectionView === "CALENDAR"
+                              ? "bg-white text-curro-blue shadow"
+                              : "text-white/80 hover:text-white"
+                          }`}
+                          title="Calendar view"
+                        >
+                          <CalendarRange className="w-3 h-3" /> Calendar
+                        </button>
+                      </div>
+                    )}
+                    {selectedInspectionTeacherId &&
+                      inspectionView === "TABLE" &&
+                      selectedInspectionDate && (
+                        <button
+                          onClick={() => setSelectedInspectionDate(null)}
+                          className="px-3 py-2 bg-amber-500/90 hover:bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow"
+                          title="Show all dates"
+                        >
+                          <X className="w-3 h-3" /> Show all dates
+                        </button>
+                      )}
                   </div>
                 </div>
               </div>
@@ -3311,8 +3911,18 @@ export default function AdminPanel({
                     Please select a teacher from the dropdown above to view their complete invigilation history and session breakdown.
                   </p>
                 </div>
+              ) : inspectionView === "CALENDAR" ? (
+                <InspectionCalendar
+                  teacherId={selectedInspectionTeacherId}
+                  entries={entries}
+                  dayPeriodConfigs={dayPeriodConfigs}
+                  onPickDate={(d) => {
+                    setSelectedInspectionDate(d);
+                    setInspectionView("TABLE");
+                  }}
+                />
               ) : (
-                <div className="overflow-x-auto overflow-y-auto max-h-[600px] scrollbar-thin scrollbar-thumb-gray-200">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-22rem)] min-h-[500px] scrollbar-thin scrollbar-thumb-gray-200">
                   <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 z-20 bg-gray-50">
                       <tr className="border-b border-gray-100">
@@ -3331,7 +3941,7 @@ export default function AdminPanel({
                     <tbody className="divide-y divide-gray-50">
                       {(() => {
                         const teacherAssignments = entries.flatMap((entry) => {
-                          if (!entry.invigilatorAssignments) return [];
+                          if (!entry.invigilatorAssignments) {return [];}
                           
                           const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
                           const d = parseISO(entry.date);
@@ -3341,7 +3951,7 @@ export default function AdminPanel({
 
                           return Object.entries(entry.invigilatorAssignments)
                             .filter(([key, tId]) => {
-                              if (tId !== selectedInspectionTeacherId) return false;
+                              if (tId !== selectedInspectionTeacherId) {return false;}
                               return true;
                             })
                             .map(([key, _]) => {
@@ -3351,7 +3961,7 @@ export default function AdminPanel({
                               const role = parts[2];
                               
                               const period = datePeriods[pIdx] || (datePeriods.length > 0 ? datePeriods[0] : null);
-                              if (!period) return null;
+                              if (!period) {return null;}
 
                               const venue = venues.find(v => v.id === vId);
                               const durationMinutes = period 
@@ -3378,7 +3988,8 @@ export default function AdminPanel({
                                 pIdx
                               };
                             }).filter(Boolean);
-                        }).sort((a, b) => a!.date.localeCompare(b!.date) || a!.startTime.localeCompare(b!.startTime));
+                        }).sort((a, b) => a!.date.localeCompare(b!.date) || a!.startTime.localeCompare(b!.startTime))
+                          .filter((ta) => !selectedInspectionDate || ta!.date === selectedInspectionDate);
 
                         const teacher = teachers.find(t => t.id === selectedInspectionTeacherId);
                         const preference = teacher?.invigilationPreference || 'SCATTERED';
@@ -3454,23 +4065,29 @@ export default function AdminPanel({
                                     {row!.techMin || "-"}
                                   </td>
                                   <td className="px-4 py-4 text-center">
-                                    <button 
-                                      onClick={async () => {
-                                        if (!confirm("Are you sure you want to remove this specific assignment?")) return;
-                                        setIsSaving(true);
-                                        try {
-                                          const entry = entries.find(e => e.id === row!.entryId);
-                                          if (entry && entry.invigilatorAssignments) {
-                                            const newAssIdx = { ...entry.invigilatorAssignments };
-                                            delete newAssIdx[row!.assignmentKey];
-                                            await updateDoc(doc(db, "entries", row!.entryId), { invigilatorAssignments: newAssIdx });
+                                    <button
+                                      onClick={() => setConfirmState({
+                                        open: true,
+                                        title: "Remove assignment",
+                                        message: "Are you sure you want to remove this specific assignment?",
+                                        variant: "destructive",
+                                        confirmLabel: "Remove",
+                                        onConfirm: async () => {
+                                          setIsSaving(true);
+                                          try {
+                                            const entry = entries.find(e => e.id === row!.entryId);
+                                            if (entry && entry.invigilatorAssignments) {
+                                              const newAssIdx = { ...entry.invigilatorAssignments };
+                                              delete newAssIdx[row!.assignmentKey];
+                                              await updateDoc(doc(db, "entries", row!.entryId), { invigilatorAssignments: newAssIdx });
+                                            }
+                                          } catch (e) {
+                                            handleFirestoreError(e, OperationType.UPDATE, "entries");
+                                          } finally {
+                                            setIsSaving(false);
                                           }
-                                        } catch (e) {
-                                          handleFirestoreError(e, OperationType.UPDATE, "entries");
-                                        } finally {
-                                          setIsSaving(false);
-                                        }
-                                      }}
+                                        },
+                                      })}
                                       className="p-1 hover:bg-curro-red/10 rounded-full text-curro-red/40 hover:text-curro-red transition-all"
                                       title="Delete Duplicate/Error"
                                     >
@@ -3644,6 +4261,7 @@ export default function AdminPanel({
           />
         )}
       </AnimatePresence>
+      <ConfirmFromState state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }
@@ -3691,41 +4309,8 @@ function TimetableModal({
   const periodSlots = PERIODS.filter((p) => !p.break);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-      >
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-curro-red">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">
-                {teacher.firstName} {teacher.lastName}
-              </h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Master Timetable Configuration
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+    <Modal open onClose={onClose} title={`${teacher.firstName} ${teacher.lastName} – Master Timetable`} size="lg">
+        <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between -mx-6 -mt-6 mb-4">
           <div className="flex bg-white rounded-xl p-1 shadow-inner border border-gray-200">
             {[1, 2].map((c) => (
               <button
@@ -3819,8 +4404,7 @@ function TimetableModal({
             </button>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -3853,41 +4437,8 @@ function SubjectsModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-      >
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-curro-red">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">
-                {teacher.firstName} {teacher.lastName}
-              </h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Faculty Subject Specialization
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
+    <Modal open onClose={onClose} title={`${teacher.firstName} ${teacher.lastName} – Subject Specialization`} size="md">
+        <div className="space-y-6">
           <div className="space-y-3">
             <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1 mb-1 block">
               Add Subject from Master List
@@ -3978,8 +4529,7 @@ function SubjectsModal({
             </button>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4014,41 +4564,8 @@ function AddTeacherModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
-      >
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-curro-red">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <UserPlus className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">
-                Add New Faculty
-              </h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Pre-register staff member
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} title="Add New Faculty" size="sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
@@ -4157,8 +4674,7 @@ function AddTeacherModal({
             </button>
           </div>
         </form>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4186,39 +4702,8 @@ function EditTeacherModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
-      >
-        <div className="bg-zinc-800 p-6 text-white flex items-center justify-between border-b-4 border-curro-blue">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <Edit2 className="w-6 h-6 text-curro-blue" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">Edit Profile</h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Update {teacher.id} details
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+    <Modal open onClose={onClose} title={`Edit Profile – ${teacher.id}`} size="sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
               Email Association
@@ -4312,8 +4797,7 @@ function EditTeacherModal({
             </button>
           </div>
         </form>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4362,39 +4846,8 @@ function BreakDutyModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
-      >
-        <div className="bg-amber-500 p-6 text-white flex items-center justify-between border-b-4 border-amber-700">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Coffee className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">Staff Duties</h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Manage duties for {teacher.lastName}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
+    <Modal open onClose={onClose} title={`Staff Duties – ${teacher.lastName}`} size="sm">
+        <div className="space-y-6">
           <div className="flex p-1 bg-gray-100 rounded-xl gap-1">
             <button
               onClick={() => setActiveTab("BREAK")}
@@ -4534,8 +4987,7 @@ function BreakDutyModal({
             </button>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4562,39 +5014,8 @@ function HomeRoomModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden"
-      >
-        <div className="bg-indigo-600 p-6 text-white flex items-center justify-between border-b-4 border-indigo-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Home className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">Home Room</h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                {teacher.firstName} {teacher.lastName}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-6">
+    <Modal open onClose={onClose} title={`Home Room – ${teacher.firstName} ${teacher.lastName}`} size="sm">
+        <div className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
@@ -4667,8 +5088,7 @@ function HomeRoomModal({
             )}
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4715,41 +5135,8 @@ function LeaveRequestModal({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-    >
-      <motion.div
-        initial={{ scale: 0.95, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.95, y: 20 }}
-        className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl shadow-curro-blue/10 overflow-hidden my-8"
-      >
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-curro-red">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <CalendarOff className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black leading-tight">
-                Schedule Leave
-              </h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
-                Faculty Member: {teacher.firstName} {teacher.lastName}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2">
+    <Modal open onClose={onClose} title={`Schedule Leave – ${teacher.firstName} ${teacher.lastName}`} size="md">
+        <div className="grid grid-cols-1 md:grid-cols-2 -mx-6 -my-6">
           {/* Form */}
           <form
             onSubmit={handleSubmit}
@@ -4954,8 +5341,7 @@ function LeaveRequestModal({
             </div>
           </div>
         </div>
-      </motion.div>
-    </motion.div>
+    </Modal>
   );
 }
 
@@ -4969,7 +5355,6 @@ function ExamTimetableTab({
   allSubjectsList,
   lockedDates,
   onBackup,
-  onOpenRules,
 }: {
   date: string;
   setDate: (d: string) => void;
@@ -4980,7 +5365,6 @@ function ExamTimetableTab({
   allSubjectsList: Subject[];
   lockedDates: string[];
   onBackup?: () => void;
-  onOpenRules?: () => void;
 }) {
   const isLocked = lockedDates.includes(date);
 
@@ -5004,9 +5388,9 @@ function ExamTimetableTab({
   const getExamSeries = (dateStr: string) => {
     const d = parseISO(dateStr);
     const month = d.getMonth() + 1;
-    if (month >= 5 && month <= 6) return "May/June Exam";
-    if (month >= 8 && month <= 9) return "Prelim Exam (Aug/Sept)";
-    if (month >= 10 && month <= 12) return "End of Year Exam";
+    if (month >= 5 && month <= 6) {return "May/June Exam";}
+    if (month >= 8 && month <= 9) {return "Prelim Exam (Aug/Sept)";}
+    if (month >= 10 && month <= 12) {return "End of Year Exam";}
     return "Other Series";
   };
 
@@ -5022,7 +5406,7 @@ function ExamTimetableTab({
   const seriesInvigilationMinutes = seriesEntries.reduce((sum, e) => {
     const assignedCount = Object.entries(e.invigilatorAssignments || {}).filter(([k, _]) => {
       const vId = k.split("_")[1];
-      if (vId === "GRADE") return true;
+      if (vId === "GRADE") {return true;}
       return e.venueIds?.includes(vId);
     }).length;
     return sum + assignedCount * (e.durationMinutes || 0);
@@ -5067,7 +5451,7 @@ function ExamTimetableTab({
     venueIds?: string[],
     existingId?: string,
   ) => {
-    if (!existingId && !subject) return;
+    if (!existingId && !subject) {return;}
 
     const entryId =
       existingId ||
@@ -5121,7 +5505,7 @@ function ExamTimetableTab({
     s: "MORNING" | "AFTERNOON",
     currentEntries: TimetableEntry[],
   ) => {
-    if (currentEntries.length === 0) return;
+    if (currentEntries.length === 0) {return;}
     const currentMode = currentEntries[0].sessionMode || "SIMULTANEOUS";
     const newMode =
       currentMode === "SIMULTANEOUS" ? "SEQUENTIAL" : "SIMULTANEOUS";
@@ -5139,7 +5523,7 @@ function ExamTimetableTab({
   };
 
   const getTeacherCodes = (subject: string) => {
-    if (!subject) return "";
+    if (!subject) {return "";}
     const isFAL = subject === "First Additional Languages";
 
     return teachers
@@ -5364,7 +5748,7 @@ function ExamTimetableTab({
                           ));
                         }
 
-                        if (isLocked) return null;
+                        if (isLocked) {return null;}
 
                         return (
                           <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center">
@@ -5518,7 +5902,7 @@ function ExamTimetableTab({
                           ));
                         }
 
-                        if (isLocked) return null;
+                        if (isLocked) {return null;}
 
                         return (
                           <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center">
@@ -5857,14 +6241,23 @@ function VenuesTab({
 }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingVenue, setEditingVenue] = useState<Venue | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
 
-  const handleDelete = async (venueId: string) => {
-    if (!confirm("Are you sure you want to delete this venue?")) return;
-    try {
-      await deleteDoc(doc(db, "venues", venueId));
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, `venues/${venueId}`);
-    }
+  const handleDelete = (venueId: string) => {
+    setConfirmState({
+      open: true,
+      title: "Delete venue",
+      message: "Are you sure you want to delete this venue?",
+      variant: "destructive",
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "venues", venueId));
+        } catch (e) {
+          handleFirestoreError(e, OperationType.DELETE, `venues/${venueId}`);
+        }
+      },
+    });
   };
 
   return (
@@ -6017,6 +6410,7 @@ function VenuesTab({
           />
         )}
       </AnimatePresence>
+      <ConfirmFromState state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }
@@ -6041,31 +6435,8 @@ function VenueModal({
   const [isSaving, setIsSaving] = useState(false);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="bg-white rounded-[32px] w-full max-w-md shadow-2xl relative overflow-hidden border border-white"
-      >
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-curro-blue rounded-xl text-white shadow-lg shadow-blue-500/20">
-                <MapPin className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-black text-text-dark uppercase tracking-tight font-sans">
-                {venue ? "Edit Venue" : "Add New Venue"}
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
-            >
-              <X className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
-
+    <Modal open onClose={onClose} title={venue ? "Edit Venue" : "Add New Venue"} size="sm">
+        <div>
           <div className="space-y-5 font-sans">
             <div>
               <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
@@ -6157,8 +6528,7 @@ function VenueModal({
             </button>
           </div>
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 
@@ -6207,7 +6577,6 @@ function SchedulerTab({
   getRelevantPeriodsIdx,
   hasIncompleteVenues,
   hasIncompleteVenuesForSelectedDate,
-  onOpenRules,
 }: {
   teachers: Teacher[];
   entries: TimetableEntry[];
@@ -6253,8 +6622,9 @@ function SchedulerTab({
   getRelevantPeriodsIdx: (s: "MORNING" | "AFTERNOON", dur: number, e?: TimetableEntry) => number[];
   hasIncompleteVenues: boolean;
   hasIncompleteVenuesForSelectedDate: boolean;
-  onOpenRules?: () => void;
 }) {
+  const toast = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [isConfiguringPeriods, setIsConfiguringPeriods] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeSession, setActiveSession] = useState<"MORNING" | "AFTERNOON">("MORNING");
@@ -6325,25 +6695,34 @@ function SchedulerTab({
      // logic to reset
   };
   
-  const handleClearDay = async () => {
-    if (!window.confirm(`Are you sure you want to clear ALL assignments for ${selectedDate}?`)) return;
-    try {
-      setIsGenerating(true);
-      const batch = writeBatch(db);
-      dayEntries.forEach(entry => {
-        batch.update(doc(db, "timetableEntries", entry.id), {
-          invigilatorAssignments: {},
-          updatedAt: new Date().toISOString()
-        });
-      });
-      await batch.commit();
-      alert("Cleared all assignments for today.");
-    } catch (e) {
-      console.error(e);
-      alert("Failed to clear assignments.");
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleClearDay = () => {
+    setConfirmState({
+      open: true,
+      title: "Clear all assignments",
+      message: `Type CLEAR to confirm clearing all assignments for ${selectedDate}.`,
+      variant: "destructive",
+      requireTyped: "CLEAR",
+      confirmLabel: "Clear assignments",
+      onConfirm: async () => {
+        try {
+          setIsGenerating(true);
+          const batch = writeBatch(db);
+          dayEntries.forEach(entry => {
+            batch.update(doc(db, "timetableEntries", entry.id), {
+              invigilatorAssignments: {},
+              updatedAt: new Date().toISOString()
+            });
+          });
+          await batch.commit();
+          toast.success("Cleared all assignments for today.");
+        } catch (e) {
+          console.error(e);
+          toast.error("Failed to clear assignments.");
+        } finally {
+          setIsGenerating(false);
+        }
+      },
+    });
   };
 
   const grade12SubjectsToday = useMemo(() => 
@@ -6357,11 +6736,11 @@ function SchedulerTab({
       if (entry.invigilatorAssignments) {
         Object.entries(entry.invigilatorAssignments).forEach(([key, tIdValue]) => {
           const tId = tIdValue as string;
-          if (!map[tId]) map[tId] = [];
+          if (!map[tId]) {map[tId] = [];}
           const pIdxMatch = key.match(/^(\d+)_/);
           if (pIdxMatch) {
             const pIdx = parseInt(pIdxMatch[1]);
-            if (!map[tId].includes(pIdx)) map[tId].push(pIdx);
+            if (!map[tId].includes(pIdx)) {map[tId].push(pIdx);}
           }
         });
       }
@@ -6375,7 +6754,7 @@ function SchedulerTab({
       AFTERNOON: new Set<string>(),
     };
     dayEntries.forEach((entry) => {
-      if (!map[entry.session]) map[entry.session] = new Set<string>();
+      if (!map[entry.session]) {map[entry.session] = new Set<string>();}
       if (entry.venueIds) {
         entry.venueIds.forEach((vId) => {
           map[entry.session].add(vId);
@@ -6387,7 +6766,7 @@ function SchedulerTab({
 
   const sortedDayEntries = useMemo(() => {
     return [...dayEntries].sort((a, b) => {
-      if (a.session !== b.session) return a.session === "MORNING" ? -1 : 1;
+      if (a.session !== b.session) {return a.session === "MORNING" ? -1 : 1;}
       return (b.grade || 0) - (a.grade || 0);
     });
   }, [dayEntries]);
@@ -6402,7 +6781,7 @@ function SchedulerTab({
     if (isAssigned) {
       // Remove all assignments for this teacher in this entry
       Object.entries(newAssignments).forEach(([k, tid]) => {
-        if (tid === teacherId) delete newAssignments[k];
+        if (tid === teacherId) {delete newAssignments[k];}
       });
     } else {
       // Find FIRST available slot for this teacher in this entry
@@ -6423,13 +6802,13 @@ function SchedulerTab({
               break;
             }
           }
-          if (found) break;
+          if (found) {break;}
         }
-        if (found) break;
+        if (found) {break;}
       }
       
       if (!found) {
-        alert("No open slots found in this session for this teacher.");
+        toast.error("No open slots found in this session for this teacher.");
         return;
       }
     }
@@ -6508,7 +6887,7 @@ function SchedulerTab({
       );
     } catch (e) {
       console.error("Remove Assignment Error:", e);
-      alert("Failed to remove assignment. Please try again.");
+      toast.error("Failed to remove assignment. Please try again.");
     }
   };
 
@@ -6521,27 +6900,27 @@ function SchedulerTab({
   ) => {
     const g = typeof grade === "string" ? parseInt(grade) : grade;
     if (g === 12)
-      return allVenues
+      {return allVenues
         .filter(
           (v) => v.name?.toLowerCase().includes("hall") || v.type === "Hall",
         )
-        .map((v) => v.id);
+        .map((v) => v.id);}
 
     let list: string[] = [];
-    if (g === 11) list = ["Kunene", "Lubbe", "Rakhoabe", "Fourie", "Pienaar"];
-    else if (g === 10) list = ["Ferreira", "Lezar", "Westhuizen", "Dlamini"];
+    if (g === 11) {list = ["Kunene", "Lubbe", "Rakhoabe", "Fourie", "Pienaar"];}
+    else if (g === 10) {list = ["Ferreira", "Lezar", "Westhuizen", "Dlamini"];}
     else if (g === 9)
-      list = ["Mathabe", "Mngadi", "Sehlapelo", "Diaman", "Letswalo"];
+      {list = ["Mathabe", "Mngadi", "Sehlapelo", "Diaman", "Letswalo"];}
     else if (g === 8) {
        // Support specific IDs provided by user
        const specificIds = ["TB1", "TB2", "TB3", "TB4"];
        const g8Venues = allVenues.filter(v => specificIds.includes(v.id)).map(v => v.id);
-       if (g8Venues.length > 0) return g8Venues;
+       if (g8Venues.length > 0) {return g8Venues;}
        
        list = ["Makowa", "Moutan", "Pather", "Govender", "Mvuke"];
     }
 
-    if (list.length === 0) return [];
+    if (list.length === 0) {return [];}
 
     const needed = g === 11 ? 5 : Math.ceil(count / 25);
     const selectedNames = list.slice(0, needed);
@@ -6576,12 +6955,12 @@ function SchedulerTab({
     const t = teachers.find(t => t.id === teacherId);
     if (t) {
       const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      if (name.includes("merike") && name.includes("van dyk")) return true;
+      if (name.includes("merike") && name.includes("van dyk")) {return true;}
     }
 
     const datePeriods = getPeriodsForDate(dateStr);
     const period = datePeriods[periodIdx];
-    if (!period) return false;
+    if (!period) {return false;}
 
     const request = (leaveRequests || []).find(
       (lr) =>
@@ -6589,14 +6968,14 @@ function SchedulerTab({
         lr.date === dateStr &&
         (lr.status === "APPROVED" || lr.status === "PENDING"),
     );
-    if (!request) return false;
+    if (!request) {return false;}
 
     // Special Override: Shelton Hu is available on 18-19 June for Visual Art Tech support
     if (teacherId === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
       return false;
     }
 
-    if (request.isFullDay) return true;
+    if (request.isFullDay) {return true;}
 
     if (request.startTime || request.endTime) {
       const pStart = period.start;
@@ -6710,19 +7089,6 @@ function SchedulerTab({
                 />
               </div>
             </div>
-            <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <h4 className="text-[10px] font-black text-text-muted uppercase tracking-widest">
-                Scheduling Logic
-              </h4>
-              <button
-                onClick={onOpenRules}
-                className="flex items-center gap-1.5 px-3 py-1 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-violet-200/50 shadow-sm"
-              >
-                <Sliders className="w-3 h-3" />
-                Rules & Criteria
-              </button>
-            </div>
             <div className="flex flex-col gap-2">
               <button
                 onClick={async () => {
@@ -6736,10 +7102,10 @@ function SchedulerTab({
                         }
                       }
                     }
-                    alert("Auto-assigned venues for all exams in range.");
+                    toast.success("Auto-assigned venues for all exams in range.");
                   } catch (err) {
                     console.error(err);
-                    alert("Failed to auto-assign venues.");
+                    toast.error("Failed to auto-assign venues.");
                   } finally {
                     setIsGenerating(false);
                   }
@@ -6810,8 +7176,7 @@ function SchedulerTab({
                 </button>
               </div>
             </div>
-          </div>
-          <input
+            <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -6950,7 +7315,7 @@ function SchedulerTab({
                   const isAssignedHere = Object.keys(assignments).some(
                     (k) => k.startsWith(`${pIdx}_`) && assignments[k] === t.id,
                   );
-                  if (isAssignedHere) return false;
+                  if (isAssignedHere) {return false;}
 
                   // Specialist Exception: Allow simultaneous TECH roles for specialists
                   if (isSpecialistForThisEntry && roleCheck === "TECH") {
@@ -6994,7 +7359,7 @@ function SchedulerTab({
 
             const filteredTeachersWithStatus = eligibleTeachersWithStatus.filter(ts => {
               const isRestrictedByG12Day = entry.grade === 12 && grade12SubjectsToday.some(sub => isTeacherRestricted(ts.teacher, sub));
-              if (isRestrictedByG12Day && !(ts.isEntrySpecialist && isPrac)) return false;
+              if (isRestrictedByG12Day && !(ts.isEntrySpecialist && isPrac)) {return false;}
 
               if (isWednesdayFirstPeriod && !ts.isEntrySpecialist) {
                 if (ts.teacher.homeRoomGrade) {
@@ -7009,7 +7374,7 @@ function SchedulerTab({
               (ts) => ts.primaryFor.length > 0 && !ts.isRestricted,
             ).sort((a, b) => {
               const ln = (a.teacher.lastName || "").localeCompare(b.teacher.lastName || "");
-              if (ln !== 0) return ln;
+              if (ln !== 0) {return ln;}
               return (a.teacher.firstName || "").localeCompare(b.teacher.firstName || "");
             });
             const techTeachers = isPrac
@@ -7017,9 +7382,9 @@ function SchedulerTab({
                   .filter((ts) => ts.techStaffEligible)
                   .sort((a, b) => {
                     const specDiff = (b.isEntrySpecialist ? 1 : 0) - (a.isEntrySpecialist ? 1 : 0);
-                    if (specDiff !== 0) return specDiff;
+                    if (specDiff !== 0) {return specDiff;}
                     const ln = (a.teacher.lastName || "").localeCompare(b.teacher.lastName || "");
-                    if (ln !== 0) return ln;
+                    if (ln !== 0) {return ln;}
                     return (a.teacher.firstName || "").localeCompare(b.teacher.firstName || "");
                   })
               : [];
@@ -7031,7 +7396,7 @@ function SchedulerTab({
                 (!isPrac || !ts.techStaffEligible),
             ).sort((a, b) => {
               const ln = (a.teacher.lastName || "").localeCompare(b.teacher.lastName || "");
-              if (ln !== 0) return ln;
+              if (ln !== 0) {return ln;}
               return (a.teacher.firstName || "").localeCompare(b.teacher.firstName || "");
             });
 
@@ -7299,14 +7664,14 @@ function SchedulerTab({
                                           const tId =
                                             e.dataTransfer.getData("teacherId");
                                           if (tId)
-                                            handleAssignInvigilator(
+                                            {handleAssignInvigilator(
                                               pIdx,
                                               tId,
                                               entry,
                                               venueId,
                                               role,
                                               index,
-                                            );
+                                            );}
                                         }}
                                         className={`group relative p-2 rounded-xl border-2 border-dashed transition-all min-h-[60px] flex flex-col items-center justify-center text-center ${statusColors[status]}`}
                                       >
@@ -7461,14 +7826,14 @@ function SchedulerTab({
                                                   "teacherId",
                                                 );
                                               if (tId)
-                                                handleAssignInvigilator(
+                                                {handleAssignInvigilator(
                                                   pIdx,
                                                   tId,
                                                   entry,
                                                   venue.id,
                                                   type,
                                                   index,
-                                                );
+                                                );}
                                             }}
                                             className={`group relative p-2 rounded-xl border-2 border-dashed transition-all min-h-[60px] flex flex-col items-center justify-center text-center ${statusColors[status]}`}
                                           >
@@ -7562,7 +7927,7 @@ function SchedulerTab({
                                 e.dataTransfer.setData("teacherId", t.id)
                               }
                               onClick={() => {
-                                if (isBlocked) return;
+                                if (isBlocked) {return;}
                                 handleAssignInvigilator(
                                   pIdx,
                                   t.id,
@@ -7660,7 +8025,7 @@ function SchedulerTab({
                                 e.dataTransfer.setData("teacherId", t.id)
                               }
                               onClick={() => {
-                                if (isBlocked) return;
+                                if (isBlocked) {return;}
                                 handleToggleAssignment(entry, t.id);
                               }}
                               className={`flex items-center justify-between p-4 rounded-2xl border transition-all group overflow-hidden ${
@@ -7793,7 +8158,7 @@ function SchedulerTab({
                                 e.dataTransfer.setData("teacherId", t.id)
                               }
                               onClick={() => {
-                                if (isBlocked) return;
+                                if (isBlocked) {return;}
                                 handleToggleAssignment(entry, t.id);
                               }}
                               className={`flex items-center justify-between p-4 rounded-2xl border transition-all group overflow-hidden ${
@@ -7894,20 +8259,17 @@ function SchedulerTab({
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isEqualizing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-blue-950/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              className="bg-white rounded-[40px] shadow-2xl border border-white p-10 max-w-xl w-full text-center relative overflow-hidden"
-            >
-              <div className="absolute top-0 left-0 w-full h-2 bg-gray-100/50">
+      <Modal
+        open={isEqualizing}
+        onClose={() => {}}
+        title="Equalizing Workload"
+        size="md"
+        hideClose
+        dismissOnBackdrop={false}
+        dismissOnEscape={false}
+      >
+            <div className="text-center relative overflow-hidden">
+              <div className="absolute -top-6 -left-6 -right-6 h-2 bg-gray-100/50">
                 <motion.div
                   className="h-full bg-emerald-500"
                   initial={{ width: 0 }}
@@ -7926,10 +8288,6 @@ function SchedulerTab({
                 </div>
               </div>
 
-              <h2 className="text-2xl font-black text-text-dark tracking-tighter mb-2">
-                Equalizing Workload
-              </h2>
-              
               <div className="my-6 h-32 w-full bg-gray-50 rounded-2xl p-2 border border-blue-100/30">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={interactiveWorkload}>
@@ -8002,10 +8360,9 @@ function SchedulerTab({
               <p className="mt-8 text-[9px] font-bold text-text-muted opacity-50 uppercase tracking-widest">
                 Please do not close or refresh this tab
               </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+      </Modal>
+      <ConfirmFromState state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }
@@ -8035,39 +8392,11 @@ function PeriodConfigModal({
     }
   }, [isOpen, activePeriods]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 min-h-screen">
-      <div
-        className="absolute inset-0 bg-text-dark/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="relative bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-      >
-        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-          <div>
-            <h3 className="text-xl font-black text-text-dark uppercase tracking-tight flex items-center gap-2">
-              <Clock3 className="w-5 h-5 text-curro-blue" />
-              Configure Period Times
-            </h3>
-            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1">
-              Customizing {dayName} ({selectedDate})
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-xl transition-all"
-          >
-            <X className="w-5 h-5 text-text-muted" />
-          </button>
-        </div>
-
-        <div className="p-8 overflow-y-auto custom-scrollbar flex-1">
+    <Modal open={isOpen} onClose={onClose} title={`Configure Period Times – ${dayName} (${selectedDate})`} size="md">
+        <div>
           <div className="space-y-3">
             {localPeriods.map((period, idx) => (
               <div
@@ -8155,8 +8484,7 @@ function PeriodConfigModal({
             Reset to Defaults
           </button>
         </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }
 
@@ -8173,6 +8501,8 @@ function SubjectsTab({
   isSaving: boolean;
   onBackup?: () => void;
 }) {
+  const toast = useToast();
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newName, setNewName] = useState("");
@@ -8180,7 +8510,7 @@ function SubjectsTab({
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSave = async () => {
-    if (!newCode || !newName) return;
+    if (!newCode || !newName) {return;}
     const normalizedName = normalizeSubjectName(newName);
 
     // Uniqueness check (Case-insensitive)
@@ -8192,7 +8522,7 @@ function SubjectsTab({
     );
 
     if (exists) {
-      alert("This subject code or name already exists in the master list.");
+      toast.error("This subject code or name already exists in the master list.");
       return;
     }
 
@@ -8214,18 +8544,21 @@ function SubjectsTab({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (
-      !confirm(
-        "Are you sure? This will remove the subject from the master list.",
-      )
-    )
-      return;
-    try {
-      await deleteDoc(doc(db, "subjects", id));
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, `subjects/${id}`);
-    }
+  const handleDelete = (id: string) => {
+    setConfirmState({
+      open: true,
+      title: "Remove subject",
+      message: "Are you sure? This will remove the subject from the master list.",
+      variant: "destructive",
+      confirmLabel: "Remove",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "subjects", id));
+        } catch (e) {
+          handleFirestoreError(e, OperationType.DELETE, `subjects/${id}`);
+        }
+      },
+    });
   };
 
   const reset = () => {
@@ -8235,19 +8568,18 @@ function SubjectsTab({
     setIsAdding(false);
   };
 
-  const handleSyncAndLink = async () => {
-    if (
-      !confirm(
-        "This will populate the Master Subject list from Faculty profiles and the current schedule, then ensure all timetable entries use the normalized names. This may take a moment. Proceed?",
-      )
-    )
-      return;
+  const handleSyncAndLink = () => {
+    setConfirmState({
+      open: true,
+      title: "Sync subjects from faculty + schedule",
+      message: "This will populate the Master Subject list from Faculty profiles and the current schedule, then ensure all timetable entries use the normalized names. This may take a moment. Proceed?",
+      confirmLabel: "Sync",
+      onConfirm: async () => {
+        setIsSyncing(true);
+        let addedCount = 0;
+        let linkedCount = 0;
 
-    setIsSyncing(true);
-    let addedCount = 0;
-    let linkedCount = 0;
-
-    try {
+        try {
       const foundNames = new Set<string>();
 
       // 1. Collect from Faculty
@@ -8256,7 +8588,7 @@ function SubjectsTab({
           if (t.subjects && Array.isArray(t.subjects)) {
             t.subjects.forEach((s) => {
               const name = s.name || s.code;
-              if (name) foundNames.add(normalizeSubjectName(name));
+              if (name) {foundNames.add(normalizeSubjectName(name));}
             });
           }
         });
@@ -8265,7 +8597,7 @@ function SubjectsTab({
       // 2. Collect from Schedule
       if (entries && Array.isArray(entries)) {
         entries.forEach((e) => {
-          if (e.subject) foundNames.add(normalizeSubjectName(e.subject));
+          if (e.subject) {foundNames.add(normalizeSubjectName(e.subject));}
         });
       }
 
@@ -8287,7 +8619,7 @@ function SubjectsTab({
       // 4. Link/Update timetable entries (Parallelized for speed)
       if (entries && Array.isArray(entries)) {
         const updatePromises = entries.map(async (entry) => {
-          if (!entry.subject) return;
+          if (!entry.subject) {return;}
           const normName = normalizeSubjectName(entry.subject);
           if (entry.subject !== normName) {
             await updateDoc(doc(db, "timetableEntries", entry.id), {
@@ -8299,27 +8631,28 @@ function SubjectsTab({
         await Promise.all(updatePromises);
       }
 
-      alert(
-        `Operation Successful!\n\n- Found ${foundNames.size} unique subjects.\n- Added ${addedCount} new subjects to your Master Registry.\n- Updated ${linkedCount} timetable entries to use normalized names.`,
+      toast.success(
+        `Sync complete. Found ${foundNames.size} unique subjects, added ${addedCount} to the master registry, normalized ${linkedCount} timetable entries.`,
       );
-    } catch (e) {
-      console.error("Sync Error:", e);
-      handleFirestoreError(e, OperationType.WRITE, "subjects/sync");
-    } finally {
-      setIsSyncing(false);
-    }
+        } catch (e) {
+          console.error("Sync Error:", e);
+          handleFirestoreError(e, OperationType.WRITE, "subjects/sync");
+        } finally {
+          setIsSyncing(false);
+        }
+      },
+    });
   };
 
-  const handleReconstructVisualArt = async () => {
-    if (
-      !confirm(
-        "This will reconstruct Visual Art sessions for 18-19 June (Thu/Fri) to 8.5 hours starting at 07:50. Proceed?",
-      )
-    )
-      return;
-
-    try {
-      // Find entries that are ALREADY Visual Art on those OR nearby dates
+  const handleReconstructVisualArt = () => {
+    setConfirmState({
+      open: true,
+      title: "Reconstruct Visual Art sessions",
+      message: "This will reconstruct Visual Art sessions for 18-19 June (Thu/Fri) to 8.5 hours starting at 07:50. Proceed?",
+      confirmLabel: "Reconstruct",
+      onConfirm: async () => {
+        try {
+          // Find entries that are ALREADY Visual Art on those OR nearby dates
       const targets = ["2026-06-18", "2026-06-19", "2026-06-20"];
       const visualArtEntries = entries.filter(
         (e) =>
@@ -8328,7 +8661,7 @@ function SubjectsTab({
       );
 
       if (visualArtEntries.length === 0) {
-        alert(
+        toast.error(
           "No Visual Art entries found on 18, 19, or 20 June to reconstruct.",
         );
         return;
@@ -8338,8 +8671,8 @@ function SubjectsTab({
         let newDate = entry.date;
         // If it was Fri (19) move to Thu (18)
         // If it was Sat (20) move to Fri (19)
-        if (entry.date === "2026-06-19") newDate = "2026-06-18";
-        if (entry.date === "2026-06-20") newDate = "2026-06-19";
+        if (entry.date === "2026-06-19") {newDate = "2026-06-18";}
+        if (entry.date === "2026-06-20") {newDate = "2026-06-19";}
 
         await setDoc(
           doc(db, "timetableEntries", entry.id),
@@ -8366,10 +8699,12 @@ function SubjectsTab({
           });
         }
       }
-      alert("Visual Art reconstruction complete.");
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, "Visual Art Reconstruction");
-    }
+          toast.success("Visual Art reconstruction complete.");
+        } catch (e) {
+          handleFirestoreError(e, OperationType.WRITE, "Visual Art Reconstruction");
+        }
+      },
+    });
   };
 
   return (
@@ -8605,6 +8940,7 @@ function SubjectsTab({
           </div>
         </div>
       </div>
+      <ConfirmFromState state={confirmState} onClose={() => setConfirmState(null)} />
     </div>
   );
 }
@@ -8624,7 +8960,7 @@ function StatsModal({
 }) {
   const stats = useMemo(() => {
     const dates = [...new Set(entries.map((e) => e.date))].sort();
-    if (dates.length === 0) return [];
+    if (dates.length === 0) {return [];}
 
     return teachers
       .map((t) => {
@@ -8635,7 +8971,7 @@ function StatsModal({
         dates.forEach((date) => (dailySessions[date] = 0));
 
         entries.forEach((e) => {
-          if (!e.invigilatorAssignments) return;
+          if (!e.invigilatorAssignments) {return;}
           Object.entries(e.invigilatorAssignments).forEach(([key, tid]) => {
             if (tid === t.id) {
               const parts = key.split("_");
@@ -8644,7 +8980,7 @@ function StatsModal({
               
               if (!isNaN(pIdx)) {
                  dailySessions[e.date]++; 
-                 if (role === "TECH") techSessions++;
+                 if (role === "TECH") {techSessions++;}
               }
             }
           });
@@ -8671,40 +9007,8 @@ function StatsModal({
   }, [teachers, entries]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-blue-950/40 backdrop-blur-md z-[101] flex items-center justify-center p-6"
-    >
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0, y: 20 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white rounded-[40px] shadow-2xl border border-white p-8 max-w-4xl w-full flex flex-col max-h-[90vh] overflow-hidden"
-      >
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center">
-              <BarChart2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-text-dark tracking-tighter">
-                Invigilator Stats
-              </h2>
-              <p className="text-xs text-text-muted font-bold uppercase tracking-widest">
-                Daily Session Distribution
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-3 hover:bg-gray-100 rounded-2xl transition-colors"
-          >
-            <X className="w-6 h-6 text-text-muted" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+    <Modal open={isOpen} onClose={onClose} title="Invigilator Stats – Daily Session Distribution" size="lg">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-100">
@@ -8755,320 +9059,6 @@ function StatsModal({
             </tbody>
           </table>
         </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function RulesModal({ 
-  rules, 
-  onClose, 
-  onSave 
-}: { 
-  rules: RulesConfig; 
-  onClose: () => void; 
-  onSave: (rules: RulesConfig) => void; 
-}) {
-  const [localRules, setLocalRules] = useState<RulesConfig>(rules);
-
-  const handlePackingChange = (key: keyof RulesConfig["packing"], value: any) => {
-    setLocalRules(prev => ({
-      ...prev,
-      packing: { ...prev.packing, [key]: value }
-    }));
-  };
-
-  const handleEqualizeChange = (key: keyof RulesConfig["equalize"], value: any) => {
-    setLocalRules(prev => ({
-      ...prev,
-      equalize: { ...prev.equalize, [key]: value }
-    }));
-  };
-
-  const handleBackupRules = (type: "packing" | "equalize") => {
-    const data = type === "packing" ? localRules.packing : localRules.equalize;
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${type}_rules_backup_${format(new Date(), "yyyy-MM-dd")}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <motion.div 
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col font-sans"
-      >
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-violet-100 text-violet-600 rounded-2xl flex items-center justify-center">
-              <Sliders className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-text-dark uppercase tracking-tight">System Rules & Logic</h3>
-              <p className="text-[10px] font-black text-text-muted uppercase tracking-widest mt-0.5">Configure Auto-Generate & Equalization parameters</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-             <button 
-                onClick={() => handleBackupRules("packing")}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border border-violet-100"
-                title="Auto-Generate Rules JSON Backup"
-              >
-                <Database className="w-3 h-3" />
-                <span className="hidden sm:inline text-xs">auto-generate rules backup</span>
-              </button>
-              <button 
-                onClick={() => handleBackupRules("equalize")}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border border-emerald-100"
-                title="Equalize Rules JSON Backup"
-              >
-                <Database className="w-3 h-3" />
-                <span className="hidden sm:inline text-xs">equalize backup</span>
-              </button>
-            <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-xl transition-colors ml-1">
-              <X className="w-5 h-5 text-text-muted" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-          {/* Packing Rules */}
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h4 className="text-sm font-black text-violet-700 uppercase tracking-widest flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                Auto-Generate (Packing) Criteria
-              </h4>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">Max Day Repacks</label>
-                  <input 
-                    type="number" 
-                    value={localRules.packing.maxRepacks} 
-                    onChange={(e) => handlePackingChange("maxRepacks", parseInt(e.target.value))}
-                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500/20 transition-all font-mono"
-                  />
-                  <p className="text-[9px] text-text-muted italic">Times to try re-shuffling a day before giving up</p>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">Marathon Score Boost</label>
-                  <input 
-                    type="number" 
-                    value={localRules.packing.marathonScoreBoost} 
-                    onChange={(e) => handlePackingChange("marathonScoreBoost", parseInt(e.target.value))}
-                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500/20 font-mono"
-                  />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">Venue Repeat Boost</label>
-                  <input 
-                    type="number" 
-                    value={localRules.packing.venueRepeatScoreBoost} 
-                    onChange={(e) => handlePackingChange("venueRepeatScoreBoost", parseInt(e.target.value))}
-                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500/20 font-mono"
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">Scattered Gap Penalty</label>
-                  <input 
-                    type="number" 
-                    value={localRules.packing.scatteredGapPenalty} 
-                    onChange={(e) => handlePackingChange("scatteredGapPenalty", parseInt(e.target.value))}
-                    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-violet-500/20 font-mono"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 bg-gray-50 rounded-2xl p-6 border border-gray-100">
-               <h5 className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-4">Subject Packing Priorities</h5>
-               <div className="space-y-3">
-                 {localRules.packing.subjectPriorities.map((prior, idx) => (
-                   <div key={idx} className="flex gap-4 items-center">
-                     <input 
-                       className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none"
-                       value={prior.pattern}
-                       placeholder="e.g. Mathematics"
-                       onChange={(e) => {
-                         const next = [...localRules.packing.subjectPriorities];
-                         next[idx].pattern = e.target.value;
-                         handlePackingChange("subjectPriorities", next);
-                       }}
-                     />
-                     <input 
-                       type="number"
-                       className="w-20 bg-white border border-gray-200 rounded-lg px-3 py-2 text-xs font-bold outline-none text-center font-mono"
-                       value={prior.priority}
-                       onChange={(e) => {
-                         const next = [...localRules.packing.subjectPriorities];
-                         next[idx].priority = parseInt(e.target.value);
-                         handlePackingChange("subjectPriorities", next);
-                       }}
-                     />
-                     <button 
-                       onClick={() => {
-                         const next = localRules.packing.subjectPriorities.filter((_, i) => i !== idx);
-                         handlePackingChange("subjectPriorities", next);
-                       }}
-                       className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                     >
-                       <X className="w-3.5 h-3.5" />
-                     </button>
-                   </div>
-                 ))}
-                 <button 
-                   onClick={() => {
-                     const next = [...localRules.packing.subjectPriorities, { pattern: "", priority: 10 }];
-                     handlePackingChange("subjectPriorities", next);
-                   }}
-                   className="w-full py-2 border-2 border-dashed border-gray-200 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-violet-200 hover:text-violet-600 transition-all mt-2"
-                 >
-                   Add Priority Rule
-                 </button>
-               </div>
-            </div>
-          </section>
-
-          {/* Equalization Rules */}
-          <section className="pt-8 border-t border-gray-100">
-            <h4 className="text-sm font-black text-emerald-700 uppercase tracking-widest flex items-center gap-2 mb-6">
-              <Scale className="w-4 h-4" />
-              Equalize & Balancing Logic
-            </h4>
-
-            <div className="space-y-6">
-               <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                 <h5 className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-4">Balancing Passes</h5>
-                 <div className="space-y-3">
-                   {localRules.equalize.passes.map((pass, idx) => (
-                     <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-xl border border-gray-100">
-                        <div className="w-16 flex flex-col">
-                          <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">Pass</span>
-                          <span className="text-xs font-black text-emerald-600">{idx + 1}</span>
-                        </div>
-                        <div className="flex-1 flex items-center gap-8">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-text-muted uppercase">Sessions Limit</span>
-                            <input 
-                              type="number"
-                              className="w-16 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 text-xs font-bold outline-none font-mono"
-                              value={pass.limit}
-                              onChange={(e) => {
-                                const next = [...localRules.equalize.passes];
-                                next[idx].limit = parseInt(e.target.value);
-                                handleEqualizeChange("passes", next);
-                              }}
-                            />
-                          </div>
-                          <label className="flex items-center gap-3 cursor-pointer">
-                            <input 
-                              type="checkbox"
-                              checked={pass.respectRestricted}
-                              onChange={(e) => {
-                                const next = [...localRules.equalize.passes];
-                                next[idx].respectRestricted = e.target.checked;
-                                handleEqualizeChange("passes", next);
-                              }}
-                              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
-                            />
-                            <span className="text-[10px] font-bold text-text-dark uppercase">Respect Restricted Subjects</span>
-                          </label>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const next = localRules.equalize.passes.filter((_, i) => i !== idx);
-                            handleEqualizeChange("passes", next);
-                          }}
-                          className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                     </div>
-                   ))}
-                   <button 
-                    onClick={() => {
-                      const next = [...localRules.equalize.passes, { limit: 3, respectRestricted: true }];
-                      handleEqualizeChange("passes", next);
-                    }}
-                    className="w-full py-2 border-2 border-dashed border-gray-200 text-gray-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:border-emerald-200 hover:text-emerald-600 transition-all"
-                  >
-                    Add Balancing Pass
-                  </button>
-                 </div>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white transition-all">
-                    <label className="flex items-center gap-3 cursor-pointer mb-2">
-                      <input 
-                        type="checkbox"
-                        checked={localRules.equalize.hallPassRequiredForG12}
-                        onChange={(e) => handleEqualizeChange("hallPassRequiredForG12", e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600"
-                      />
-                      <span className="text-[10px] font-black text-text-dark uppercase tracking-widest">G12 Hall Pass</span>
-                    </label>
-                    <p className="text-[9px] text-text-muted leading-relaxed">Require explicit hall access permission for Grade 12 invigilation.</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white transition-all">
-                    <label className="flex items-center gap-3 cursor-pointer mb-2">
-                      <input 
-                        type="checkbox"
-                        checked={localRules.equalize.hallPassRequiredForHall}
-                        onChange={(e) => handleEqualizeChange("hallPassRequiredForHall", e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600"
-                      />
-                      <span className="text-[10px] font-black text-text-dark uppercase tracking-widest">Venues Hall Pass</span>
-                    </label>
-                    <p className="text-[9px] text-text-muted leading-relaxed">Require hall access for any specialized Large Hall venues.</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-white transition-all">
-                    <label className="flex items-center gap-3 cursor-pointer mb-2">
-                      <input 
-                        type="checkbox"
-                        checked={localRules.equalize.techSpecialistOnlyForPrac}
-                        onChange={(e) => handleEqualizeChange("techSpecialistOnlyForPrac", e.target.checked)}
-                        className="w-4 h-4 rounded text-emerald-600"
-                      />
-                      <span className="text-[10px] font-black text-text-dark uppercase tracking-widest">Strict Specialists</span>
-                    </label>
-                    <p className="text-[9px] text-text-muted leading-relaxed">Practical sessions exclusively reserved for subject specialists.</p>
-                  </div>
-               </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex items-center justify-end gap-4">
-          <button 
-            onClick={onClose}
-            className="px-6 py-2.5 text-xs font-black text-text-muted uppercase tracking-widest hover:text-text-dark transition-colors"
-          >
-            Discard
-          </button>
-          <button 
-            onClick={() => {
-              onSave(localRules);
-              onClose();
-            }}
-            className="px-8 py-2.5 bg-violet-600 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-violet-600/20 hover:bg-violet-700 transition-all active:scale-95 flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            Apply rules
-          </button>
-        </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 }

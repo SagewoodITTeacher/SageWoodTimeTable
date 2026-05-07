@@ -1,22 +1,30 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Teacher, ExamSession, Assignment, TimetableEntry, Venue, LeaveRequest, HelpOption, HelpRequest } from '../types';
+import { Teacher, LeaveRequest, HelpOption, HelpRequest } from '../types';
 import { format, parseISO, isSameDay, isWednesday, addMinutes } from 'date-fns';
 import { normalizeSubjectName, PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Clock, Calendar, Search, AlertCircle, Plus, X, Send, Info, Bell, MessageSquare, PhoneCall, Zap, User } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { Modal, useToast } from './ui';
+import { useSessions } from '../hooks/useSessions';
+import { useAssignments } from '../hooks/useAssignments';
+import { useTimetableEntries } from '../hooks/useTimetableEntries';
+import { useVenues } from '../hooks/useVenues';
 
 interface Props {
   user: Teacher;
-  sessions: ExamSession[];
-  assignments: Assignment[];
-  entries: TimetableEntry[];
-  venues: Venue[];
   teachers: Teacher[];
 }
 
-export default function TeacherDashboard({ user, sessions, assignments, entries, venues, teachers }: Props) {
+export default function TeacherDashboard({ user, teachers }: Props) {
+  const { data: sessions } = useSessions();
+  const { data: assignments } = useAssignments();
+  const { data: entries } = useTimetableEntries();
+  const { data: venues } = useVenues();
+  const toast = useToast();
+  const [leaveFormError, setLeaveFormError] = useState<string | null>(null);
+  const [helpFormError, setHelpFormError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +50,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Listen for help requests where user is the standby
   useEffect(() => {
-    if (!user.id) return;
+    if (!user.id) {return;}
 
     const q = query(
       collection(db, 'helpRequests'),
@@ -56,10 +64,11 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       if (requests.length > 0) {
         // Show the newest pending notification
         setActiveNotification(requests[0]);
-        // Play beep sound
+        // Play beep sound and surface a visual toast in case audio is blocked/muted
         if (audioRef.current) {
           audioRef.current.play().catch(e => console.warn("Audio play blocked", e));
         }
+        toast.info(`Help requested at ${requests[0].venueName}: ${requests[0].option}`, { duration: 6000 });
       } else {
         setActiveNotification(null);
       }
@@ -84,10 +93,13 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       });
       setIsLeaveModalOpen(false);
       setLeaveReason('');
-      alert('Leave request submitted successfully!');
+      toast.success("Leave request submitted successfully");
+      setLeaveFormError(null);
     } catch (error) {
       console.error('Error submitting leave:', error);
-      alert('Failed to submit leave request.');
+      const message = "Failed to submit leave request. Please try again.";
+      setLeaveFormError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -114,24 +126,24 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   };
 
   const mySchedule = entries.filter(entry => {
-    if (entry.date !== selectedDate) return false;
-    if (!entry.invigilatorAssignments) return false;
+    if (entry.date !== selectedDate) {return false;}
+    if (!entry.invigilatorAssignments) {return false;}
     return Object.entries(entry.invigilatorAssignments).some(([key, tid]) => {
-      if (tid !== user.id) return false;
+      if (tid !== user.id) {return false;}
       const vId = key.split('_')[1];
       const role = key.split('_')[2];
       const isStandby = vId === 'GRADE' || role === 'STANDBY';
-      if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) return false;
+      if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) {return false;}
       return true;
     });
   }).flatMap(entry => {
     const myAssignments = Object.entries(entry.invigilatorAssignments || {})
       .filter(([key, tid]) => {
-        if (tid !== user.id) return false;
+        if (tid !== user.id) {return false;}
         const vId = key.split('_')[1];
         const role = key.split('_')[2];
         const isStandby = vId === 'GRADE' || role === 'STANDBY';
-        if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) return false;
+        if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) {return false;}
         return true;
       })
       .map(([key, _]) => {
@@ -239,7 +251,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Find who takes over in the current venue next period
   const nextInvigilatorName = useMemo(() => {
-    if (!currentActivity || currentActivity.type !== 'period') return null;
+    if (!currentActivity || currentActivity.type !== 'period') {return null;}
     const nextPeriodIdx = (currentActivity as any).pIdx + 1;
     const currentVenueId = (currentActivity as any).vId;
     
@@ -259,7 +271,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Progress Bar Calculation
   const progressPercent = useMemo(() => {
-    if (!currentActivity) return 0;
+    if (!currentActivity) {return 0;}
     const [startH, startM] = currentActivity.time.split(':').map(Number);
     const [endH, endM] = currentActivity.endTime.split(':').map(Number);
     const startTotal = startH * 60 + startM;
@@ -272,7 +284,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   }, [currentActivity, now]);
 
   const handleCallHelp = async () => {
-    if (!currentActivity || !selectedHelpOption) return;
+    if (!currentActivity || !selectedHelpOption) {return;}
 
     setIsSubmitting(true);
     try {
@@ -294,7 +306,9 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       setQpQuantity(1);
     } catch (error) {
       console.error('Error calling for help:', error);
-      alert('Failed to send help request.');
+      const message = "Failed to send help request. Try the call button again.";
+      setHelpFormError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -316,7 +330,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   return (
     <div className="flex flex-col pb-12 overflow-x-hidden">
       {/* Hidden audio for notifications */}
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
+      <audio ref={audioRef} src="/sounds/help-alert.mp3" preload="auto" />
 
       {/* Salutation Header */}
       <motion.div 
@@ -576,39 +590,13 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       </AnimatePresence>
 
       {/* Call Help Modal */}
-      <AnimatePresence>
-        {isHelpModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center p-0">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsHelpModalOpen(false)}
-              className="absolute inset-0 bg-text-dark/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="relative w-full max-w-lg bg-white rounded-t-[40px] shadow-2xl overflow-hidden pb-10"
-            >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-2" />
-              
-              <div className="px-6 py-6 border-b border-gray-50 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-text-dark uppercase tracking-tight">Need Assistance?</h3>
-                  <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Select an option to alert Standby</p>
-                </div>
-                <button 
-                  onClick={() => setIsHelpModalOpen(false)}
-                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-text-muted"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-3">
+      <Modal open={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} title="Request help" size="md">
+              <div className="space-y-3">
+                {helpFormError && (
+                  <div role="alert" className="mb-1 rounded-xl border border-curro-red/30 bg-curro-red/5 px-3 py-2 text-xs font-bold text-curro-red">
+                    {helpFormError}
+                  </div>
+                )}
                 {(['Question Paper Required', 'Folio required', 'Toiletpaper required', 'Bathroom Break', 'SOS'] as HelpOption[]).map((option) => (
                   <button
                     key={option}
@@ -668,10 +656,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Modal>
 
       {/* Footer */}
       <div className="px-5 py-10 text-center opacity-40">
@@ -681,42 +666,13 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       </div>
 
       {/* Leave Request Modal */}
-      <AnimatePresence>
-        {isLeaveModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsLeaveModalOpen(false)}
-              className="absolute inset-0 bg-text-dark/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-lg bg-white rounded-t-[32px] shadow-2xl overflow-hidden pb-safe"
-            >
-              <div className="px-6 py-6 border-b border-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-curro-red/10 text-curro-red rounded-xl">
-                    <Calendar className="w-5 h-5" />
+      <Modal open={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} title="Request leave" size="md">
+              <form onSubmit={handleSubmitLeave} className="space-y-6">
+                {leaveFormError && (
+                  <div role="alert" className="rounded-2xl border border-curro-red/30 bg-curro-red/5 px-4 py-3 text-sm font-bold text-curro-red">
+                    {leaveFormError}
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-text-dark uppercase tracking-tight">Request Leave</h3>
-                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Submit for approval</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setIsLeaveModalOpen(false)}
-                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-text-muted hover:bg-gray-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitLeave} className="p-6 space-y-6">
+                )}
                 <div className="space-y-4">
                   {/* Leave Type */}
                   <div className="flex flex-col gap-1.5">
@@ -789,10 +745,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                   )}
                 </button>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Modal>
     </div>
   );
 }

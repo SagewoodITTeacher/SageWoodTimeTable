@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { Teacher, TimetableEntry, MarkingExtension, HelpRequest, LeaveRequest } from '../types';
+import React, { Suspense, useState, useEffect } from 'react';
+import { Teacher, TimetableEntry, MarkingExtension, HelpRequest } from '../types';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, updateDoc, doc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { format, addDays, parseISO, eachDayOfInterval, isSameDay, startOfDay } from 'date-fns';
 import { normalizeSubjectName } from '../constants';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
+import { WorkloadChart } from './charts';
+import { useTimetableEntries } from '../hooks/useTimetableEntries';
+import { useMarkingExtensions } from '../hooks/useMarkingExtensions';
+import { useLeaveRequests } from '../hooks/useLeaveRequests';
 import { 
   BarChart2, Calendar, Plus, Clock, CheckCircle2, XCircle, 
   AlertCircle, ChevronRight, Send, MessageSquare, UserCheck, Timer,
@@ -16,20 +16,21 @@ import {
 } from 'lucide-react';
 import { PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
+import { SectionCard } from './ui';
 
 interface Props {
   user: Teacher;
-  entries: TimetableEntry[];
-  extensions: MarkingExtension[];
   teachers: Teacher[];
-  leaveRequests: LeaveRequest[];
 }
 
 const LANGUAGES = ['English', 'Afrikaans', 'Xhosa', 'Sepedi', 'Zulu', 'Sesotho'];
 const APPROVERS = ['MERV', 'PLAL', 'EZRN'];
 const PUBLIC_HOLIDAYS = ['2026-05-01', '2026-06-16'];
 
-export default function OperationalManager({ user, entries, extensions, teachers, leaveRequests }: Props) {
+export default function OperationalManager({ user, teachers }: Props) {
+  const { data: entries } = useTimetableEntries();
+  const { data: extensions } = useMarkingExtensions();
+  const { data: leaveRequests } = useLeaveRequests();
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<TimetableEntry | null>(null);
   const [requestReason, setRequestReason] = useState('');
@@ -47,24 +48,24 @@ export default function OperationalManager({ user, entries, extensions, teachers
     const total = Object.fromEntries(teachers.map(t => [t.id, 0]));
 
     entries.forEach(entry => {
-      if (!entry.invigilatorAssignments) return;
+      if (!entry.invigilatorAssignments) {return;}
       Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-        if (!total.hasOwnProperty(tid)) return;
+        if (!total.hasOwnProperty(tid)) {return;}
         const parts = key.split("_");
         const pIdx = parseInt(parts[0]);
         const vId = parts[1];
         const role = parts[2];
-        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) return;
+        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) {return;}
         const periods = format(parseISO(entry.date), "EEEE") === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
         const p = periods[pIdx];
         if (p) {
           const [h1, m1] = p.start.split(":").map(Number);
           const [h2, m2] = p.end.split(":").map(Number);
           const dur = (h2 * 60 + m2) - (h1 * 60 + m1);
-          if (role === "STANDBY") standbyMinutes[tid] += dur;
-          else if (role === "TECH") tech[tid] += dur;
-          else if (entry.session === 'MORNING') morning[tid] += dur;
-          else afternoon[tid] += dur;
+          if (role === "STANDBY") {standbyMinutes[tid] += dur;}
+          else if (role === "TECH") {tech[tid] += dur;}
+          else if (entry.session === 'MORNING') {morning[tid] += dur;}
+          else {afternoon[tid] += dur;}
           total[tid] += dur;
         }
       });
@@ -128,7 +129,7 @@ export default function OperationalManager({ user, entries, extensions, teachers
 
   const addWorkingDays = (startDate: Date, days: number) => {
     let date = new Date(startDate);
-    if (days === 0) return date;
+    if (days === 0) {return date;}
     
     let added = 0;
     while (added < days) {
@@ -142,7 +143,7 @@ export default function OperationalManager({ user, entries, extensions, teachers
 
   const handleRequestExtension = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedEntry) return;
+    if (!selectedEntry) {return;}
 
     setIsSubmitting(true);
     try {
@@ -238,7 +239,7 @@ export default function OperationalManager({ user, entries, extensions, teachers
         const mTime = data.morning.reduce((acc, e) => acc + (Number(e.durationMinutes) || 0), 0);
         const mLearners = data.morning.reduce((acc, e) => {
           const totalField = Number(e.totalStudents);
-          if (!isNaN(totalField) && totalField > 0) return acc + totalField;
+          if (!isNaN(totalField) && totalField > 0) {return acc + totalField;}
           const boys = Number(e.totalBoys) || 0;
           const girls = Number(e.totalGirls) || 0;
           return acc + boys + girls;
@@ -248,7 +249,7 @@ export default function OperationalManager({ user, entries, extensions, teachers
         const aTime = data.afternoon.reduce((acc, e) => acc + (Number(e.durationMinutes) || 0), 0);
         const aLearners = data.afternoon.reduce((acc, e) => {
           const totalField = Number(e.totalStudents);
-          if (!isNaN(totalField) && totalField > 0) return acc + totalField;
+          if (!isNaN(totalField) && totalField > 0) {return acc + totalField;}
           const boys = Number(e.totalBoys) || 0;
           const girls = Number(e.totalGirls) || 0;
           return acc + boys + girls;
@@ -329,88 +330,18 @@ export default function OperationalManager({ user, entries, extensions, teachers
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* Workload Distribution Chart Copy */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mb-0">
-        <div className="bg-emerald-600 p-6 text-white flex items-center justify-between border-b-4 border-emerald-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <BarChart2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Faculty Workload Distribution</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Global minute balance across all staff</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#0ea5e9]"></div>
-                <span className="text-[9px] font-black uppercase text-white/70">Tech</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
-                <span className="text-[9px] font-black uppercase text-white/70">Morning</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#a855f7]"></div>
-                <span className="text-[9px] font-black uppercase text-white/70">Afternoon</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="p-6 h-[400px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={workloadData} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis 
-                dataKey="name" 
-                fontSize={8} 
-                tick={{ fill: '#64748b', fontWeight: 700 }}
-                axisLine={false}
-                tickLine={false}
-                angle={-45}
-                textAnchor="end"
-                height={80}
-              />
-              <YAxis 
-                fontSize={10} 
-                tick={{ fill: '#64748b', fontWeight: 700 }}
-                axisLine={false}
-                tickLine={false}
-                label={{ value: 'Minutes', angle: -90, position: 'insideLeft', style: { fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', fill: '#94a3b8' } }}
-              />
-              <Tooltip 
-                contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                cursor={{ fill: '#f1f5f9' }}
-              />
-              <Bar dataKey="tech" stackId="a" fill="#0ea5e9" radius={[0, 0, 0, 0]} name="Tech Duty" />
-              <Bar dataKey="morning" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} name="Morning Session" />
-              <Bar dataKey="afternoon" stackId="a" fill="#a855f7" radius={[0, 0, 0, 0]} name="Afternoon Session" />
-              <Bar dataKey="standby" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} name="Standby Minutes" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Incident Rapports Section */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mb-0">
-        <div className="bg-curro-red p-6 text-white flex items-center justify-between border-b-4 border-red-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Incident Rapports</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Real-time Invigilation Assistance Log</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-              {helpRequests.filter(r => r.status === 'PENDING').length} PENDING
-            </span>
-          </div>
-        </div>
-        
+      <SectionCard
+        variant="red"
+        title="Incident Rapports"
+        subtitle="Real-time Invigilation Assistance Log"
+        icon={<ShieldAlert className="w-6 h-6" />}
+        headerActions={
+          <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+            {helpRequests.filter(r => r.status === 'PENDING').length} PENDING
+          </span>
+        }
+      >
         <div className="overflow-x-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-200">
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-gray-50">
@@ -503,27 +434,20 @@ export default function OperationalManager({ user, entries, extensions, teachers
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Leave Section */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mb-0">
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-blue-900">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <CalendarOff className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Leave</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Faculty Absence & Leave Records</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
-              {leaveRequests.filter(r => r.status === 'PENDING').length} PENDING
-            </span>
-          </div>
-        </div>
-        
+      <SectionCard
+        variant="blue"
+        title="Leave"
+        subtitle="Faculty Absence & Leave Records"
+        icon={<CalendarOff className="w-6 h-6" />}
+        headerActions={
+          <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+            {leaveRequests.filter(r => r.status === 'PENDING').length} PENDING
+          </span>
+        }
+      >
         <div className="overflow-x-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-200">
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10 bg-gray-50">
@@ -611,39 +535,34 @@ export default function OperationalManager({ user, entries, extensions, teachers
             </tbody>
           </table>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Header Section */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-        <div className="bg-emerald-600 p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 border-b-4 border-emerald-800">
-          <div className="flex items-center gap-5">
-            <button 
-              onClick={downloadSeriesWorkloadCSV}
-              className="w-14 h-14 bg-white/20 hover:bg-white/30 rounded-2xl flex items-center justify-center shadow-inner transition-all active:scale-95 group"
-              title="Download Series Workload CSV"
-            >
-              <Download className="w-8 h-8 group-hover:animate-bounce" />
-            </button>
-            <div>
-              <h3 className="text-2xl font-black leading-tight uppercase tracking-tight">Marking Operations</h3>
-              <p className="text-white/70 text-xs font-black uppercase tracking-widest flex items-center gap-2 mt-1">
-                <Timer className="w-3 h-3" />
-                Operational Progress & Extensions
-              </p>
-            </div>
-          </div>
-          
+      <SectionCard
+        variant="emerald"
+        title="Marking Operations"
+        subtitle="Operational Progress & Extensions"
+        icon={
+          <button
+            onClick={downloadSeriesWorkloadCSV}
+            className="hover:bg-white/30 rounded-2xl flex items-center justify-center transition-all active:scale-95 group w-full h-full"
+            title="Download Series Workload CSV"
+          >
+            <Download className="w-6 h-6 group-hover:animate-bounce" />
+          </button>
+        }
+        headerActions={
           <div className="flex flex-col md:items-end gap-2">
-             <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Chart View Start</span>
-             <input 
+            <span className="text-[10px] font-black text-white/50 uppercase tracking-widest">Chart View Start</span>
+            <input
               type="date"
               value={format(viewDate, 'yyyy-MM-dd')}
               onChange={(e) => setViewDate(parseISO(e.target.value))}
               className="bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm font-black focus:bg-white focus:text-emerald-700 transition-all outline-none"
-             />
+            />
           </div>
-        </div>
-
+        }
+      >
         <div className="p-0 border-b border-gray-50 bg-gray-50/50">
           {/* Legend */}
           <div className="flex items-center gap-6 p-6">
@@ -770,41 +689,37 @@ export default function OperationalManager({ user, entries, extensions, teachers
             </div>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Pending Requests Section (For Approvers) */}
       {canApprove && extensions.filter(ex => ex.status === 'PENDING').length > 0 && (
-        <div className="bg-white rounded-3xl border border-amber-100 shadow-xl overflow-hidden">
-          <div className="bg-amber-500 p-6 text-white flex items-center justify-between border-b-4 border-amber-700">
-            <div className="flex items-center gap-4">
-              <AlertCircle className="w-6 h-6" />
-              <h3 className="text-lg font-black uppercase tracking-tight">Awaiting Extension Approvals</h3>
-            </div>
+        <SectionCard
+          variant="amber"
+          title="Awaiting Extension Approvals"
+          icon={<AlertCircle className="w-6 h-6" />}
+          headerActions={
             <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black">{extensions.filter(ex => ex.status === 'PENDING').length} PENDING</span>
-          </div>
+          }
+        >
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             {extensions.filter(ex => ex.status === 'PENDING').map(ext => (
               <RequestCard key={ext.id} ext={ext} onResolve={handleResolveExtension} />
             ))}
           </div>
-        </div>
+        </SectionCard>
       )}
       
       {/* Subject Extension Log */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mb-8">
-        <div className="bg-emerald-600 p-6 text-white flex items-center justify-between border-b-4 border-emerald-800">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black uppercase tracking-tight leading-tight">Subject Extension Log</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Historical and Current Extension Submissions</p>
-            </div>
-          </div>
+      <SectionCard
+        variant="emerald"
+        title="Subject Extension Log"
+        subtitle="Historical and Current Extension Submissions"
+        icon={<MessageSquare className="w-5 h-5" />}
+        headerActions={
           <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">{extensions.length} TOTAL REQUESTS</span>
-        </div>
-        
+        }
+        className="mb-8"
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -902,32 +817,28 @@ export default function OperationalManager({ user, entries, extensions, teachers
             </tbody>
           </table>
         </div>
-      </div>
-      
+      </SectionCard>
+
       {/* Admin Privilege Management (OPS Only) */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mb-10">
-        <div className="bg-gray-900 p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-6 border-b-4 border-gray-700">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <Shield className="w-6 h-6 text-curro-red" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Admin Role Management</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Control Access to Scheduler & Timetable Tools</p>
-            </div>
-          </div>
+      <SectionCard
+        variant="zinc"
+        title="Admin Role Management"
+        subtitle="Control Access to Scheduler & Timetable Tools"
+        icon={<Shield className="w-6 h-6 text-curro-red" />}
+        headerActions={
           <div className="relative w-full md:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
+            <input
+              type="text"
               placeholder="Search faculty..."
               value={adminSearchTerm}
               onChange={(e) => setAdminSearchTerm(e.target.value)}
               className="w-full bg-white/10 border border-white/20 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold focus:bg-white focus:text-gray-900 transition-all outline-none"
             />
           </div>
-        </div>
-        
+        }
+        className="mb-10"
+      >
         <div className="max-h-[500px] overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-gray-50/30">
           {teachers
             .filter(t => 
@@ -938,8 +849,8 @@ export default function OperationalManager({ user, entries, extensions, teachers
             .sort((a, b) => {
               const aIsAdmin = a.roles.includes('ADMIN');
               const bIsAdmin = b.roles.includes('ADMIN');
-              if (aIsAdmin && !bIsAdmin) return -1;
-              if (!aIsAdmin && bIsAdmin) return 1;
+              if (aIsAdmin && !bIsAdmin) {return -1;}
+              if (!aIsAdmin && bIsAdmin) {return 1;}
               return a.lastName.localeCompare(b.lastName);
             })
             .map(t => (
@@ -976,47 +887,21 @@ export default function OperationalManager({ user, entries, extensions, teachers
               </div>
             ))}
         </div>
-      </div>
+      </SectionCard>
 
       {/* Workload Balance Chart (Rule 18) */}
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8">
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-blue-900">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-              <BarChart2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-tight">Workload Balance Chart</h3>
-              <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">Faculty Invigilation Load Monitoring</p>
-            </div>
-          </div>
-        </div>
-        
+      <SectionCard
+        variant="blue"
+        title="Workload Balance Chart"
+        subtitle="Faculty Invigilation Load Monitoring"
+        icon={<BarChart2 className="w-6 h-6" />}
+        className="mt-8"
+      >
         <div className="p-8">
           <div className="h-[400px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={workloadData} barCategoryGap="20%">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#9ca3af" 
-                  fontSize={8} 
-                  angle={-90}
-                  textAnchor="end"
-                  interval={0}
-                  height={100}
-                />
-                <YAxis stroke="#9ca3af" fontSize={10} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                  itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                />
-                <Bar dataKey="tech" fill="#0ea5e9" stackId="a" name="Tech" />
-                <Bar dataKey="morning" fill="#3b82f6" stackId="a" name="Morning" />
-                <Bar dataKey="afternoon" fill="#a855f7" stackId="a" name="Afternoon" />
-                <Bar dataKey="standby" fill="#10b981" stackId="a" name="Standby" />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-100 rounded" />}>
+              <WorkloadChart data={workloadData} />
+            </Suspense>
           </div>
           
           <div className="mt-8 overflow-x-auto">
@@ -1046,7 +931,7 @@ export default function OperationalManager({ user, entries, extensions, teachers
              </table>
           </div>
         </div>
-      </div>
+      </SectionCard>
 
       {/* Request Modal */}
       <AnimatePresence>

@@ -36,7 +36,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         }
       } catch (e) {
         // Not a JSON error message, stick with default or raw message
-        if (this.state.error.message) errorMessage = this.state.error.message;
+        if (this.state.error.message) {errorMessage = this.state.error.message;}
       }
 
       return (

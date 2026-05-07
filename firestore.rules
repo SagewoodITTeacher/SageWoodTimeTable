@@ -15,37 +15,40 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Since the user wants a custom login and a shareable link, we allow 
-    // any authenticated (including anonymous) user to interact with the data.
-    // The UI handles the 'CURRO' password check for role switching.
+    // Roles are enforced server-side via the user's /users/{uid}.roles array.
+    // Anonymous auth is no longer permitted; sign-in is via Firebase Auth Google provider.
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function userDoc() {
+      // Reads the caller's user profile. Returns null if the doc doesn't exist.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function hasRole(role) {
+      return isSignedIn()
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && (role in userDoc().data.roles);
+    }
+
+    function isAdmin()              { return hasRole('ADMIN'); }
+    function isWebmaster()          { return hasRole('WEBMASTER'); }
+    function isOperationalManager() { return hasRole('OPERATIONAL_MANAGER'); }
+    function isApprover() {
+      return isSignedIn()
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && userDoc().data.canApproveExtensions == true;
+    }
+
     function isAuthorized() {
+      // Legacy alias — anything calling this should migrate to a specific role.
+      // Kept narrow for now so existing call sites keep working.
       return isSignedIn();
-    }
-
-    function isAdmin() {
-      // In this version, we trust any authenticated user to read/write 
-      // if they got past the custom login screen.
-      return isAuthorized();
-    }
-
-    function isWebmaster() {
-      return isAuthorized();
-    }
-
-    function isOperationalManager() {
-      return isAuthorized();
     }
 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function isApprover() {
-      return isAuthorized();
     }
 
     function incoming() {

@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
-import { Teacher, ExamSession, TimetableEntry, DayPeriodConfig } from '../types';
+import React, { Suspense, useMemo } from 'react';
+import { Teacher } from '../types';
 import { motion } from 'motion/react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
+import { RoleDistributionPieChart, SeriesWorkloadChart } from './charts';
+import { useSessions } from '../hooks/useSessions';
+import { useTimetableEntries } from '../hooks/useTimetableEntries';
+import { useDayPeriodConfigs } from '../hooks/useDayPeriodConfigs';
 import { 
   Activity, Server, Database, ShieldAlert, 
   Settings, Globe, Cpu, Network, User, Clock, AlertCircle
@@ -15,12 +15,12 @@ import { parseISO, format } from 'date-fns';
 interface Props {
   user: Teacher;
   teachers: Teacher[];
-  sessions: ExamSession[];
-  entries: TimetableEntry[];
-  dayPeriodConfigs: DayPeriodConfig[];
 }
 
-export default function WebmasterPanel({ user, teachers, sessions, entries, dayPeriodConfigs }: Props) {
+export default function WebmasterPanel({ user, teachers }: Props) {
+  const { data: sessions } = useSessions();
+  const { data: entries } = useTimetableEntries();
+  const { data: dayPeriodConfigs } = useDayPeriodConfigs();
   // Calculate workload statistics
   const workloadStats = useMemo(() => {
     const morning = Object.fromEntries(teachers.map(t => [t.id, 0]));
@@ -31,13 +31,13 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
     const total = Object.fromEntries(teachers.map(t => [t.id, 0]));
 
     entries.forEach(entry => {
-      if (!entry.invigilatorAssignments) return;
+      if (!entry.invigilatorAssignments) {return;}
       
       const config = dayPeriodConfigs.find(c => c.id === entry.date);
       const periodsToUse = config?.periods || (format(parseISO(entry.date), "EEEE") === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS);
 
       Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-        if (!total.hasOwnProperty(tid)) return;
+        if (!total.hasOwnProperty(tid)) {return;}
 
         const parts = key.split("_");
         const pIdx = parseInt(parts[0]);
@@ -45,7 +45,7 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
         const role = parts[2];
 
         // Ensure we only count assignments for venues actually still assigned to this entry
-        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) return;
+        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) {return;}
         
         const p = periodsToUse[pIdx];
         let duration = entry.durationMinutes || 120;
@@ -108,7 +108,7 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
           }
       }).sort((a, b) => {
       const ln = (a.lastName || "").localeCompare(b.lastName || "");
-      if (ln !== 0) return ln;
+      if (ln !== 0) {return ln;}
       return (a.firstName || "").localeCompare(b.firstName || "");
     });
   }, [entries, teachers, dayPeriodConfigs]);
@@ -129,10 +129,10 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
   ];
 
   return (
-    <div className="flex flex-col gap-6 pb-20 text-white font-sans">
+    <div className="-mx-4 md:-mx-8 -mt-4 px-4 md:px-8 pt-6 pb-20 bg-zinc-950 text-white font-sans rounded-3xl flex flex-col gap-6 min-h-[calc(100vh-6rem)]">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-black tracking-tight text-white uppercase">System Diagnostics</h2>
-        <p className="text-gray-500 font-medium text-sm">Core infrastructure monitoring and global settings.</p>
+        <p className="text-gray-400 font-medium text-sm">Core infrastructure monitoring and global settings.</p>
       </div>
 
       {/* Grid Status Cards */}
@@ -171,27 +171,9 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
             Role Distribution
           </h3>
           <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={roleData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {roleData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff', fontSize: '12px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
+              <RoleDistributionPieChart data={roleData} colors={COLORS} />
+            </Suspense>
           </div>
           <div className="flex justify-center flex-wrap gap-4 mt-2">
             {roleData.map((d, i) => (
@@ -247,29 +229,9 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
           </h3>
           
           <div className="h-[400px] w-full mb-8">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={workloadStats} barCategoryGap="20%">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#6b7280" 
-                  fontSize={8} 
-                  angle={-90}
-                  textAnchor="end"
-                  interval={0}
-                  height={100}
-                />
-                <YAxis stroke="#6b7280" fontSize={10} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff', fontSize: '12px' }}
-                />
-                <Bar dataKey="tech" fill="#0ea5e9" stackId="a" name="Tech" />
-                <Bar dataKey="morning" fill="#3b82f6" stackId="a" name="Morning" />
-                <Bar dataKey="afternoon" fill="#a855f7" stackId="a" name="Afternoon" />
-                <Bar dataKey="standby" fill="#10b981" stackId="a" name="Standby" />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
+              <SeriesWorkloadChart data={workloadStats} />
+            </Suspense>
           </div>
 
           <div className="overflow-x-auto">
