@@ -282,8 +282,29 @@ export default function OperationalManager({ user, teachers }: Props) {
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <nav className="sticky top-28 z-40 bg-bg-gray/95 backdrop-blur-sm border-b border-gray-100 -mx-4 md:-mx-8 px-4 md:px-8 py-3 flex items-center gap-2 overflow-x-auto" aria-label="Operations sections">
+        {[
+          { id: 'incidents', label: 'Incidents', Icon: ShieldAlert },
+          { id: 'leave', label: 'Leave', Icon: CalendarOff },
+          { id: 'marking', label: 'Marking', Icon: Activity },
+          { id: 'extensions', label: 'Extensions', Icon: AlertCircle },
+          { id: 'extension-log', label: 'Log', Icon: MessageSquare },
+          { id: 'admin-roles', label: 'Roles', Icon: Shield },
+          { id: 'workload', label: 'Workload', Icon: BarChart2 },
+        ].map(s => (
+          <a
+            key={s.id}
+            href={`#${s.id}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-text-muted hover:bg-gray-100 hover:text-text-dark transition-colors whitespace-nowrap"
+          >
+            <s.Icon className="w-3 h-3" />
+            {s.label}
+          </a>
+        ))}
+      </nav>
       {/* Incident Rapports Section */}
       <SectionCard
+        id="incidents"
         variant="red"
         title="Incident Rapports"
         subtitle="Real-time Invigilation Assistance Log"
@@ -390,6 +411,7 @@ export default function OperationalManager({ user, teachers }: Props) {
 
       {/* Leave Section */}
       <SectionCard
+        id="leave"
         variant="blue"
         title="Leave"
         subtitle="Faculty Absence & Leave Records"
@@ -491,6 +513,7 @@ export default function OperationalManager({ user, teachers }: Props) {
 
       {/* Header Section */}
       <SectionCard
+        id="marking"
         variant="emerald"
         title="Marking Operations"
         subtitle="Operational Progress & Extensions"
@@ -646,6 +669,7 @@ export default function OperationalManager({ user, teachers }: Props) {
       {/* Pending Requests Section (For Approvers) */}
       {canApprove && extensions.filter(ex => ex.status === 'PENDING').length > 0 && (
         <SectionCard
+          id="extensions"
           variant="amber"
           title="Awaiting Extension Approvals"
           icon={<AlertCircle className="w-6 h-6" />}
@@ -663,6 +687,7 @@ export default function OperationalManager({ user, teachers }: Props) {
       
       {/* Subject Extension Log */}
       <SectionCard
+        id="extension-log"
         variant="emerald"
         title="Subject Extension Log"
         subtitle="Historical and Current Extension Submissions"
@@ -773,6 +798,7 @@ export default function OperationalManager({ user, teachers }: Props) {
 
       {/* Admin Privilege Management (OPS Only) */}
       <SectionCard
+        id="admin-roles"
         variant="zinc"
         title="Admin Role Management"
         subtitle="Control Access to Scheduler & Timetable Tools"
@@ -844,6 +870,7 @@ export default function OperationalManager({ user, teachers }: Props) {
 
       {/* Workload Balance Chart (Rule 18) */}
       <SectionCard
+        id="workload"
         variant="blue"
         title="Workload Balance Chart"
         subtitle="Faculty Invigilation Load Monitoring"

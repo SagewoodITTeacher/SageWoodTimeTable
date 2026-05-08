@@ -44,6 +44,7 @@ export interface SectionCardProps {
   icon?: ReactNode;
   headerActions?: ReactNode;
   className?: string;
+  id?: string;
   children: ReactNode;
 }
 
@@ -54,11 +55,13 @@ export function SectionCard({
   icon,
   headerActions,
   className,
+  id,
   children,
 }: SectionCardProps) {
   const v = VARIANTS[variant];
   return (
     <section
+      id={id}
       className={cn(
         "bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden",
         className
