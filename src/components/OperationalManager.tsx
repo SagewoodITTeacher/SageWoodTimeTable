@@ -17,6 +17,7 @@ import {
 import { PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { SectionCard, Modal } from './ui';
+import { computeWorkload } from '../lib/workload';
 
 interface Props {
   user: Teacher;
@@ -40,59 +41,10 @@ export default function OperationalManager({ user, teachers }: Props) {
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
 
-  const workloadData = React.useMemo(() => {
-    const morning = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const afternoon = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const tech = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const standbyMinutes = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const total = Object.fromEntries(teachers.map(t => [t.id, 0]));
-
-    entries.forEach(entry => {
-      if (!entry.invigilatorAssignments) {return;}
-      Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-        if (!total.hasOwnProperty(tid)) {return;}
-        const parts = key.split("_");
-        const pIdx = parseInt(parts[0]);
-        const vId = parts[1];
-        const role = parts[2];
-        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) {return;}
-        const periods = format(parseISO(entry.date), "EEEE") === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
-        const p = periods[pIdx];
-        if (p) {
-          const [h1, m1] = p.start.split(":").map(Number);
-          const [h2, m2] = p.end.split(":").map(Number);
-          const dur = (h2 * 60 + m2) - (h1 * 60 + m1);
-          if (role === "STANDBY") {standbyMinutes[tid] += dur;}
-          else if (role === "TECH") {tech[tid] += dur;}
-          else if (entry.session === 'MORNING') {morning[tid] += dur;}
-          else {afternoon[tid] += dur;}
-          total[tid] += dur;
-        }
-      });
-    });
-
-    return teachers.filter(t => {
-      const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      const isMerike = name.includes("merike") && name.includes("van dyk");
-      const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-      const isSpec = t.id === "JACB" || t.id === "SHHU" || t.id === "CPMO" || t.id === "ENYA" || t.id === "ORMA";
-      return (t.activeRole !== "WEBMASTER" || isFranz || isSpec) && (t.canInvigilate !== false || isFranz || isSpec) && !isMerike;
-    }).map(t => {
-      const isSpec = t.id === "JACB" || t.id === "SHHU" || t.id === "CPMO" || t.id === "ENYA" || t.id === "ORMA" || t.id === "FRAN" || t.id === "NORT";
-      const loadWeight = isSpec ? 0.7 : 1.0;
-      return {
-        name: `${t.lastName}, ${t.firstName}`,
-        morning: morning[t.id],
-        afternoon: afternoon[t.id],
-        tech: tech[t.id],
-        standby: standbyMinutes[t.id],
-        total: total[t.id],
-        id: t.id,
-        loadWeight,
-        adjTotal: Math.round(total[t.id] / loadWeight)
-      };
-    }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [entries, teachers]);
+  const workloadData = React.useMemo(
+    () => computeWorkload(entries, teachers, []),
+    [entries, teachers],
+  );
 
   // Real-time help requests listener
   useEffect(() => {
