@@ -12,7 +12,6 @@ import {
   setDoc,
   deleteDoc,
 } from "firebase/firestore";
-import { FAL_SUBJECTS } from "../../../constants";
 import {
   CalendarRange,
   Download,
@@ -28,7 +27,7 @@ import {
 } from "lucide-react";
 import { parseISO } from "date-fns";
 import { TimetableField } from "../shared/TimetableField";
-import { isExcludedFromInvigilation } from "../shared/helpers";
+import { isExcludedFromInvigilation, isTeacherRestricted } from "../shared/helpers";
 
 export function ExamTimetableTab({
   date,
@@ -205,21 +204,9 @@ export function ExamTimetableTab({
 
   const getTeacherCodes = (subject: string) => {
     if (!subject) {return "";}
-    const isFAL = subject === "First Additional Languages";
 
     return teachers
-      .filter((t) => {
-        const teacherSubjects =
-          t.subjects?.map((s) => (s.name || s.code).toLowerCase()) || [];
-        if (isFAL) {
-          return teacherSubjects.some(
-            (ts) =>
-              FAL_SUBJECTS.some((f) => f.toLowerCase() === ts) ||
-              ts === "first additional languages",
-          );
-        }
-        return teacherSubjects.some((ts) => ts === subject.toLowerCase());
-      })
+      .filter((t) => isTeacherRestricted(t, subject))
       .map((t) => t.id)
       .join(", ");
   };

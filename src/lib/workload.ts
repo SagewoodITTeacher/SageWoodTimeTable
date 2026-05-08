@@ -1,5 +1,5 @@
 import { Teacher, TimetableEntry, DayPeriodConfig } from '../types';
-import { resolvePeriodsForDate, periodDurationMinutes, isExcludedFromInvigilation } from '../components/admin/shared/helpers';
+import { resolvePeriodsForDate, periodDurationMinutes, isExcludedFromInvigilation, ALL_SPECIALIST_IDS } from '../components/admin/shared/helpers';
 
 export interface WorkloadRow {
   name: string;
@@ -23,7 +23,7 @@ export interface StaffConfig {
 
 const DEFAULT_STAFF_CONFIG: StaffConfig = {
   excludedNames: ['merike van dyk'],
-  specialistIds: ['FRAN', 'JACB', 'NORT', 'ORMA', 'CHAM', 'EZNY', 'ORIM', 'CPMO', 'ENYA', 'SHEH', 'SHHU'],
+  specialistIds: ALL_SPECIALIST_IDS,
   specialistLoadWeight: 0.7,
 };
 
