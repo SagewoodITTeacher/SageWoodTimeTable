@@ -10,7 +10,7 @@ import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { ToastProvider } from './components/ui';
 
 const TeacherDashboard = lazy(() => import('./components/TeacherDashboard'));
-const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const AdminPanel = lazy(() => import('./components/admin'));
 const WebmasterPanel = lazy(() => import('./components/WebmasterPanel'));
 const OperationalManager = lazy(() => import('./components/OperationalManager'));
 
