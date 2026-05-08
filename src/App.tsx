@@ -168,9 +168,9 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className={`flex rounded-lg p-1 border transition-colors ${
-            activeUser.activeRole === 'WEBMASTER' 
-              ? 'bg-white/10 border-white/20' 
+          <div role="tablist" aria-label="Role switcher" className={`flex rounded-lg p-1 border transition-colors ${
+            activeUser.activeRole === 'WEBMASTER'
+              ? 'bg-white/10 border-white/20'
               : 'bg-white/10 border-white/20'
           }`}>
             {(['WEBMASTER', 'OPERATIONAL_MANAGER', 'ADMIN', 'TEACHER'] as Role[])
@@ -178,6 +178,8 @@ export default function App() {
               .map((role) => (
                 <button
                   key={role}
+                  role="tab"
+                  aria-selected={activeUser.activeRole === role}
                   onClick={() => switchRole(role)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
                     activeUser.activeRole === role
@@ -198,10 +200,12 @@ export default function App() {
           
           <div className="flex items-center gap-3 pl-4 border-l border-white/20">
             {activeUser.activeRole !== 'OPERATIONAL_MANAGER' && activeUser.roles.includes('OPERATIONAL_MANAGER') && (
-              <div 
+              <div
                 onClick={() => switchRole('OPERATIONAL_MANAGER')}
                 className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/30 transition-all shadow-lg group mr-1"
                 title="Switch to OPS Panel"
+                role="button"
+                aria-label="Switch to OPS Panel"
               >
                 <BarChart2 className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
               </div>
