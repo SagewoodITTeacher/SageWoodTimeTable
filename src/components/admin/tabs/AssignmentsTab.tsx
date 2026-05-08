@@ -15,7 +15,7 @@ import {
   ArrowUpRight,
   Zap,
 } from "lucide-react";
-import { getEntryTimes, getTimetableCell, resolvePeriodsForDate } from "../shared/helpers";
+import { getEntryTimes, getTimetableCell, resolvePeriodsForDate, TH_CLASS, safeFirestoreWrite } from "../shared/helpers";
 
 export interface AssignmentsTabProps {
   // Data
@@ -121,18 +121,15 @@ export function AssignmentsTab({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
-                          try {
-                            await updateDoc(
+                          await safeFirestoreWrite(
+                            () => updateDoc(
                               doc(db, "leaveRequests", req.id),
                               { status: "APPROVED" },
-                            );
-                          } catch (e) {
-                            handleFirestoreError(
-                              e,
-                              OperationType.WRITE,
-                              `leaveRequests/${req.id}`,
-                            );
-                          }
+                            ),
+                            OperationType.WRITE,
+                            `leaveRequests/${req.id}`,
+                            handleFirestoreError,
+                          );
                         }}
                         className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95"
                       >
@@ -140,18 +137,15 @@ export function AssignmentsTab({
                       </button>
                       <button
                         onClick={async () => {
-                          try {
-                            await updateDoc(
+                          await safeFirestoreWrite(
+                            () => updateDoc(
                               doc(db, "leaveRequests", req.id),
                               { status: "DENIED" },
-                            );
-                          } catch (e) {
-                            handleFirestoreError(
-                              e,
-                              OperationType.WRITE,
-                              `leaveRequests/${req.id}`,
-                            );
-                          }
+                            ),
+                            OperationType.WRITE,
+                            `leaveRequests/${req.id}`,
+                            handleFirestoreError,
+                          );
                         }}
                         className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95"
                       >
@@ -237,22 +231,22 @@ export function AssignmentsTab({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-white border-b border-gray-100">
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Date
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Subject
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Time / Session
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Location (Venue)
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Staff (Assigned)
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none text-right">
+                  <th className={`${TH_CLASS} text-right`}>
                     Action
                   </th>
                 </tr>
@@ -392,28 +386,28 @@ export function AssignmentsTab({
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-white border-b border-gray-100">
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Date
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Grade & Subject
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Venue
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Period Slot
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Invigilator
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Role
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Exam Start
                   </th>
-                  <th className="px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none">
+                  <th className={TH_CLASS}>
                     Exam End
                   </th>
                 </tr>

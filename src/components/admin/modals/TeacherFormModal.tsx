@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Teacher } from "../../../types";
 import { Modal } from "../../ui";
+import { INPUT_CLASS } from "../shared/helpers";
 
 interface TeacherFormModalProps {
   mode: "add" | "edit";
@@ -91,7 +92,7 @@ export function TeacherFormModal({
                     email: e.target.value.toLowerCase(),
                   })
                 }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none placeholder:text-gray-300"
+                className={`${INPUT_CLASS} placeholder:text-gray-300`}
               />
             </div>
           </div>
@@ -116,7 +117,7 @@ export function TeacherFormModal({
                   email: e.target.value.toLowerCase(),
                 })
               }
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
+              className={INPUT_CLASS}
             />
             <p className="text-[10px] text-text-muted mt-1 px-1 italic">
               When a user logs in with this email, they will be linked to this
@@ -142,7 +143,7 @@ export function TeacherFormModal({
               onChange={(e) =>
                 setFormData({ ...formData, firstName: e.target.value })
               }
-              className={`w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none${isAdd ? " placeholder:text-gray-300" : ""}`}
+              className={`${INPUT_CLASS}${isAdd ? " placeholder:text-gray-300" : ""}`}
             />
           </div>
           <div className="space-y-1">
@@ -161,7 +162,7 @@ export function TeacherFormModal({
               onChange={(e) =>
                 setFormData({ ...formData, lastName: e.target.value })
               }
-              className={`w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none${isAdd ? " placeholder:text-gray-300" : ""}`}
+              className={`${INPUT_CLASS}${isAdd ? " placeholder:text-gray-300" : ""}`}
             />
           </div>
         </div>

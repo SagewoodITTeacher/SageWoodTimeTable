@@ -31,6 +31,7 @@ import { useToast } from "../../ui";
 import { motion } from "motion/react";
 import { ConfirmFromState } from "../shared/ConfirmFromState";
 import { ConfirmState } from "../shared/types";
+import { safeFirestoreWrite } from "../shared/helpers";
 
 export function SubjectsTab({
   subjects,
@@ -70,22 +71,25 @@ export function SubjectsTab({
       return;
     }
 
-    try {
-      if (editingId) {
-        await updateDoc(doc(db, "subjects", editingId), {
-          code: newCode.toUpperCase(),
-          name: normalizedName,
-        });
-      } else {
-        await addDoc(collection(db, "subjects"), {
-          code: newCode.toUpperCase(),
-          name: normalizedName,
-        });
-      }
-      reset();
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, "subjects");
-    }
+    const result = await safeFirestoreWrite(
+      async () => {
+        if (editingId) {
+          await updateDoc(doc(db, "subjects", editingId), {
+            code: newCode.toUpperCase(),
+            name: normalizedName,
+          });
+        } else {
+          await addDoc(collection(db, "subjects"), {
+            code: newCode.toUpperCase(),
+            name: normalizedName,
+          });
+        }
+      },
+      OperationType.WRITE,
+      "subjects",
+      handleFirestoreError,
+    );
+    if (result !== undefined) { reset(); }
   };
 
   const handleDelete = (id: string) => {
@@ -96,11 +100,12 @@ export function SubjectsTab({
       variant: "destructive",
       confirmLabel: "Remove",
       onConfirm: async () => {
-        try {
-          await deleteDoc(doc(db, "subjects", id));
-        } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `subjects/${id}`);
-        }
+        await safeFirestoreWrite(
+          () => deleteDoc(doc(db, "subjects", id)),
+          OperationType.DELETE,
+          `subjects/${id}`,
+          handleFirestoreError,
+        );
       },
     });
   };

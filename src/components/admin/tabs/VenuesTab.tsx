@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { VenueModal } from "../modals/VenueModal";
 import { ConfirmFromState } from "../shared/ConfirmFromState";
 import { ConfirmState } from "../shared/types";
+import { safeFirestoreWrite } from "../shared/helpers";
 
 export function VenuesTab({
   venues,
@@ -44,11 +45,12 @@ export function VenuesTab({
       variant: "destructive",
       confirmLabel: "Delete",
       onConfirm: async () => {
-        try {
-          await deleteDoc(doc(db, "venues", venueId));
-        } catch (e) {
-          handleFirestoreError(e, OperationType.DELETE, `venues/${venueId}`);
-        }
+        await safeFirestoreWrite(
+          () => deleteDoc(doc(db, "venues", venueId)),
+          OperationType.DELETE,
+          `venues/${venueId}`,
+          handleFirestoreError,
+        );
       },
     });
   };
@@ -184,20 +186,25 @@ export function VenuesTab({
               setEditingVenue(null);
             }}
             onSave={async (vData) => {
-              try {
-                if (editingVenue) {
-                  await updateDoc(
-                    doc(db, "venues", editingVenue.id),
-                    vData as any,
-                  );
-                } else {
-                  const venueRef = doc(collection(db, "venues"), vData.id);
-                  await setDoc(venueRef, vData);
-                }
+              const result = await safeFirestoreWrite(
+                async () => {
+                  if (editingVenue) {
+                    await updateDoc(
+                      doc(db, "venues", editingVenue.id),
+                      vData as any,
+                    );
+                  } else {
+                    const venueRef = doc(collection(db, "venues"), vData.id);
+                    await setDoc(venueRef, vData);
+                  }
+                },
+                OperationType.WRITE,
+                "venues",
+                handleFirestoreError,
+              );
+              if (result !== undefined) {
                 setIsAddModalOpen(false);
                 setEditingVenue(null);
-              } catch (e) {
-                handleFirestoreError(e, OperationType.WRITE, "venues");
               }
             }}
           />

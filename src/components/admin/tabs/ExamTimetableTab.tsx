@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { parseISO } from "date-fns";
 import { TimetableField } from "../shared/TimetableField";
-import { isExcludedFromInvigilation, isTeacherRestricted } from "../shared/helpers";
+import { isExcludedFromInvigilation, isTeacherRestricted, safeFirestoreWrite } from "../shared/helpers";
 
 export function ExamTimetableTab({
   date,
@@ -53,11 +53,12 @@ export function ExamTimetableTab({
   const isLocked = lockedDates.includes(date);
 
   const toggleLock = async () => {
-    try {
-      await setDoc(doc(db, "timetableLocks", date), { locked: !isLocked });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `timetableLocks/${date}`);
-    }
+    await safeFirestoreWrite(
+      () => setDoc(doc(db, "timetableLocks", date), { locked: !isLocked }),
+      OperationType.WRITE,
+      `timetableLocks/${date}`,
+      handleFirestoreError,
+    );
   };
   const grades = [8, 9, 10, 11, 12];
   const paperTypes: TimetableEntry["paperType"][] = [
@@ -144,12 +145,11 @@ export function ExamTimetableTab({
       existingSessionEntries[0]?.sessionMode || "SIMULTANEOUS";
 
     if (!subject) {
-      await deleteDoc(entryRef).catch((e) =>
-        handleFirestoreError(
-          e,
-          OperationType.DELETE,
-          `timetableEntries/${entryId}`,
-        ),
+      await safeFirestoreWrite(
+        () => deleteDoc(entryRef),
+        OperationType.DELETE,
+        `timetableEntries/${entryId}`,
+        handleFirestoreError,
       );
       return;
     }
@@ -169,15 +169,12 @@ export function ExamTimetableTab({
       sessionMode, // Preserve or inherit mode
     };
 
-    try {
-      await setDoc(entryRef, data, { merge: true });
-    } catch (e) {
-      handleFirestoreError(
-        e,
-        OperationType.CREATE,
-        `timetableEntries/${entryId}`,
-      );
-    }
+    await safeFirestoreWrite(
+      () => setDoc(entryRef, data, { merge: true }),
+      OperationType.CREATE,
+      `timetableEntries/${entryId}`,
+      handleFirestoreError,
+    );
   };
 
   const toggleSessionMode = async (
@@ -195,11 +192,12 @@ export function ExamTimetableTab({
         sessionMode: newMode,
       }),
     );
-    try {
-      await Promise.all(updates);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "timetableEntries");
-    }
+    await safeFirestoreWrite(
+      () => Promise.all(updates),
+      OperationType.UPDATE,
+      "timetableEntries",
+      handleFirestoreError,
+    );
   };
 
   const getTeacherCodes = (subject: string) => {

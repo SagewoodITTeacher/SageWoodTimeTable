@@ -70,6 +70,7 @@ import {
   isEligibleForInvigilation,
   isSHEHOverride,
   isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
+  safeFirestoreWrite,
 } from "../shared/helpers";
 
 export function SchedulerTab({
@@ -206,23 +207,24 @@ export function SchedulerTab({
     role: string = "INVIGILATOR",
     index: number = 0,
   ) => {
-    try {
-      const currentAssignments = { ...(entry.invigilatorAssignments || {}) };
-      const key = getAssignmentKey(periodIdx, venueId, role, index);
+    const currentAssignments = { ...(entry.invigilatorAssignments || {}) };
+    const key = getAssignmentKey(periodIdx, venueId, role, index);
 
-      if (currentAssignments[key] === teacherId) {
-        delete currentAssignments[key];
-      } else {
-        currentAssignments[key] = teacherId;
-      }
+    if (currentAssignments[key] === teacherId) {
+      delete currentAssignments[key];
+    } else {
+      currentAssignments[key] = teacherId;
+    }
 
-      await updateDoc(doc(db, "timetableEntries", entry.id), {
+    await safeFirestoreWrite(
+      () => updateDoc(doc(db, "timetableEntries", entry.id), {
         invigilatorAssignments: currentAssignments,
         updatedAt: new Date().toISOString()
-      });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.WRITE, `timetableEntries/${entry.id}`);
-    }
+      }),
+      OperationType.WRITE,
+      `timetableEntries/${entry.id}`,
+      handleFirestoreError,
+    );
   };
 
   const handleSavePeriods = async () => {
@@ -353,14 +355,15 @@ export function SchedulerTab({
       }
     }
 
-    try {
-      await updateDoc(doc(db, "timetableEntries", entry.id), {
+    await safeFirestoreWrite(
+      () => updateDoc(doc(db, "timetableEntries", entry.id), {
         invigilatorAssignments: newAssignments,
         updatedAt: new Date().toISOString(),
-      });
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, "Assignment Toggle");
-    }
+      }),
+      OperationType.UPDATE,
+      "Assignment Toggle",
+      handleFirestoreError,
+    );
   };
 
 
@@ -905,16 +908,15 @@ export function SchedulerTab({
                 ? currentIds.filter((id) => id !== vId)
                 : [...currentIds, vId].slice(0, 8);
 
-              await setDoc(
-                entryRef,
-                { venueIds: newIds },
-                { merge: true },
-              ).catch((e) =>
-                handleFirestoreError(
-                  e,
-                  OperationType.WRITE,
-                  `timetableEntries/${entry.id}`,
+              await safeFirestoreWrite(
+                () => setDoc(
+                  entryRef,
+                  { venueIds: newIds },
+                  { merge: true },
                 ),
+                OperationType.WRITE,
+                `timetableEntries/${entry.id}`,
+                handleFirestoreError,
               );
             };
 

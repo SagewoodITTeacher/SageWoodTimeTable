@@ -18,7 +18,7 @@ import { doc, updateDoc, writeBatch } from "firebase/firestore";
 import { InspectionCalendar } from "../shared/InspectionCalendar";
 import { ConfirmFromState } from "../shared/ConfirmFromState";
 import { ConfirmState } from "../shared/types";
-import { resolvePeriodsForDate, periodDurationMinutes } from "../shared/helpers";
+import { resolvePeriodsForDate, periodDurationMinutes, safeFirestoreWrite } from "../shared/helpers";
 
 export interface InspectionTabProps {
   // Data
@@ -128,32 +128,32 @@ export function InspectionTab({
                           confirmLabel: "Remove",
                           onConfirm: async () => {
                             setIsSaving(true);
-                            try {
-                              const toDelete: { eid: string; key: string }[] = [];
-                              const seenTags = new Set<string>();
-                              teacherAssignments.forEach(ta => {
-                                const tag = `${ta!.date}|${ta!.start}|${ta!.end}|${ta!.subject}|${ta!.paperType}`;
-                                if (seenTags.has(tag)) {toDelete.push({ eid: ta!.eid, key: ta!.key });}
-                                else {seenTags.add(tag);}
-                              });
-                              const batch = writeBatch(db);
-                              const byEntry: { [eid: string]: any } = {};
-                              for (const item of toDelete) {
-                                if (!byEntry[item.eid]) {
-                                  const entry = entries.find(e => e.id === item.eid);
-                                  if (entry) {byEntry[item.eid] = { ...entry.invigilatorAssignments };}
-                                }
-                                if (byEntry[item.eid]) {delete byEntry[item.eid][item.key];}
+                            const toDelete: { eid: string; key: string }[] = [];
+                            const seenTags = new Set<string>();
+                            teacherAssignments.forEach(ta => {
+                              const tag = `${ta!.date}|${ta!.start}|${ta!.end}|${ta!.subject}|${ta!.paperType}`;
+                              if (seenTags.has(tag)) {toDelete.push({ eid: ta!.eid, key: ta!.key });}
+                              else {seenTags.add(tag);}
+                            });
+                            const batch = writeBatch(db);
+                            const byEntry: { [eid: string]: any } = {};
+                            for (const item of toDelete) {
+                              if (!byEntry[item.eid]) {
+                                const entry = entries.find(e => e.id === item.eid);
+                                if (entry) {byEntry[item.eid] = { ...entry.invigilatorAssignments };}
                               }
-                              for (const [eid, newAss] of Object.entries(byEntry)) {
-                                batch.update(doc(db, "entries", eid), { invigilatorAssignments: newAss });
-                              }
-                              await batch.commit();
-                            } catch (err) {
-                              handleFirestoreError(err, OperationType.UPDATE, "entries");
-                            } finally {
-                              setIsSaving(false);
+                              if (byEntry[item.eid]) {delete byEntry[item.eid][item.key];}
                             }
+                            for (const [eid, newAss] of Object.entries(byEntry)) {
+                              batch.update(doc(db, "entries", eid), { invigilatorAssignments: newAss });
+                            }
+                            await safeFirestoreWrite(
+                              () => batch.commit(),
+                              OperationType.UPDATE,
+                              "entries",
+                              handleFirestoreError,
+                            );
+                            setIsSaving(false);
                           },
                         })}
                         className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest rounded shadow-sm flex items-center gap-1 transition-all"
@@ -389,18 +389,18 @@ export function InspectionTab({
                                   confirmLabel: "Remove",
                                   onConfirm: async () => {
                                     setIsSaving(true);
-                                    try {
-                                      const entry = entries.find(e => e.id === row!.entryId);
-                                      if (entry && entry.invigilatorAssignments) {
-                                        const newAssIdx = { ...entry.invigilatorAssignments };
-                                        delete newAssIdx[row!.assignmentKey];
-                                        await updateDoc(doc(db, "entries", row!.entryId), { invigilatorAssignments: newAssIdx });
-                                      }
-                                    } catch (e) {
-                                      handleFirestoreError(e, OperationType.UPDATE, "entries");
-                                    } finally {
-                                      setIsSaving(false);
+                                    const entry = entries.find(e => e.id === row!.entryId);
+                                    if (entry && entry.invigilatorAssignments) {
+                                      const newAssIdx = { ...entry.invigilatorAssignments };
+                                      delete newAssIdx[row!.assignmentKey];
+                                      await safeFirestoreWrite(
+                                        () => updateDoc(doc(db, "entries", row!.entryId), { invigilatorAssignments: newAssIdx }),
+                                        OperationType.UPDATE,
+                                        "entries",
+                                        handleFirestoreError,
+                                      );
                                     }
+                                    setIsSaving(false);
                                   },
                                 })}
                                 className="p-1 hover:bg-curro-red/10 rounded-full text-curro-red/40 hover:text-curro-red transition-all"

@@ -3,6 +3,7 @@ import { Teacher, LeaveRequest } from "../../../types";
 import { Calendar, Clock, Trash2, ClipboardCheck, CalendarRange } from "lucide-react";
 import { format, parseISO, startOfToday } from "date-fns";
 import { Modal } from "../../ui";
+import { INPUT_CLASS } from "../shared/helpers";
 
 export function LeaveRequestModal({
   teacher,
@@ -66,7 +67,7 @@ export function LeaveRequestModal({
                 onChange={(e) =>
                   setFormData({ ...formData, date: e.target.value })
                 }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
+                className={INPUT_CLASS}
               />
             </div>
 
@@ -80,7 +81,7 @@ export function LeaveRequestModal({
                 onChange={(e) =>
                   setFormData({ ...formData, type: e.target.value as any })
                 }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
+                className={INPUT_CLASS}
               >
                 <option value="Sick Leave">Sick Leave</option>
                 <option value="Arrangement">Arrangement</option>
@@ -119,7 +120,7 @@ export function LeaveRequestModal({
                     onChange={(e) =>
                       setFormData({ ...formData, startTime: e.target.value })
                     }
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
+                    className={INPUT_CLASS}
                   />
                 </div>
                 <div className="space-y-1">
@@ -133,7 +134,7 @@ export function LeaveRequestModal({
                     onChange={(e) =>
                       setFormData({ ...formData, endTime: e.target.value })
                     }
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
+                    className={INPUT_CLASS}
                   />
                 </div>
               </div>
@@ -149,7 +150,7 @@ export function LeaveRequestModal({
                 onChange={(e) =>
                   setFormData({ ...formData, reason: e.target.value })
                 }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none min-h-[80px] resize-none"
+                className={`${INPUT_CLASS} min-h-[80px] resize-none`}
                 placeholder="Mention reasons..."
               />
             </div>

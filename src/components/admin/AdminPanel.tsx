@@ -93,6 +93,7 @@ import {
   isSHEHOverride,
   SHEH_OVERRIDE_DATES,
   isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
+  safeFirestoreWrite,
 } from "./shared/helpers";
 
 interface Props {
@@ -1623,14 +1624,13 @@ export default function AdminPanel({
       confirmLabel: "Remove",
       onConfirm: async () => {
         setIsSaving(true);
-        try {
-          const targetId = teacher.uid || teacher.id;
-          await deleteDoc(doc(db, "users", targetId));
-        } catch (error) {
-          handleFirestoreError(error, OperationType.DELETE, `users/${teacher.id}`);
-        } finally {
-          setIsSaving(false);
-        }
+        await safeFirestoreWrite(
+          () => deleteDoc(doc(db, "users", teacher.uid || teacher.id)),
+          OperationType.DELETE,
+          `users/${teacher.id}`,
+          handleFirestoreError,
+        );
+        setIsSaving(false);
       },
     });
   };
@@ -1664,17 +1664,16 @@ export default function AdminPanel({
     updates: Partial<Teacher>,
   ) => {
     setIsSaving(true);
-    try {
-      const teacher = teachers.find((t) => t.id === teacherId);
-      if (!teacher) {return;}
-      const targetId = teacher.uid || teacher.id;
-      const teacherRef = doc(db, "users", targetId);
-      await updateDoc(teacherRef, updates);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${teacherId}`);
-    } finally {
-      setIsSaving(false);
-    }
+    const teacher = teachers.find((t) => t.id === teacherId);
+    if (!teacher) { setIsSaving(false); return; }
+    const targetId = teacher.uid || teacher.id;
+    await safeFirestoreWrite(
+      () => updateDoc(doc(db, "users", targetId), updates),
+      OperationType.UPDATE,
+      `users/${teacherId}`,
+      handleFirestoreError,
+    );
+    setIsSaving(false);
   };
 
 
@@ -2012,17 +2011,17 @@ export default function AdminPanel({
               onClose={() => setIsAddModalOpen(false)}
               onSave={async (teacher) => {
                 setIsSaving(true);
-                try {
-                  await setDoc(doc(db, "users", teacher.id!), {
+                const result = await safeFirestoreWrite(
+                  () => setDoc(doc(db, "users", teacher.id!), {
                     ...teacher,
                     uid: "",
-                  });
-                  setIsAddModalOpen(false);
-                } catch (error) {
-                  handleFirestoreError(error, OperationType.CREATE, "users");
-                } finally {
-                  setIsSaving(false);
-                }
+                  }),
+                  OperationType.CREATE,
+                  "users",
+                  handleFirestoreError,
+                );
+                if (result !== undefined) { setIsAddModalOpen(false); }
+                setIsSaving(false);
               }}
               isSaving={isSaving}
             />
@@ -2074,44 +2073,38 @@ export default function AdminPanel({
               )}
               onSave={async (request) => {
                 setIsSaving(true);
-                try {
-                  const leaveRef = doc(collection(db, "leaveRequests"));
-                  await setDoc(leaveRef, { ...request, id: leaveRef.id });
-                } catch (e) {
-                  handleFirestoreError(e, OperationType.WRITE, "leaveRequests");
-                } finally {
-                  setIsSaving(false);
-                }
+                await safeFirestoreWrite(
+                  () => {
+                    const leaveRef = doc(collection(db, "leaveRequests"));
+                    return setDoc(leaveRef, { ...request, id: leaveRef.id });
+                  },
+                  OperationType.WRITE,
+                  "leaveRequests",
+                  handleFirestoreError,
+                );
+                setIsSaving(false);
               }}
               onUpdateStatus={async (requestId, status) => {
                 setIsSaving(true);
-                try {
-                  await updateDoc(doc(db, "leaveRequests", requestId), {
+                await safeFirestoreWrite(
+                  () => updateDoc(doc(db, "leaveRequests", requestId), {
                     status,
-                  });
-                } catch (e) {
-                  handleFirestoreError(
-                    e,
-                    OperationType.WRITE,
-                    `leaveRequests/${requestId}`,
-                  );
-                } finally {
-                  setIsSaving(false);
-                }
+                  }),
+                  OperationType.WRITE,
+                  `leaveRequests/${requestId}`,
+                  handleFirestoreError,
+                );
+                setIsSaving(false);
               }}
               onDelete={async (requestId) => {
                 setIsSaving(true);
-                try {
-                  await deleteDoc(doc(db, "leaveRequests", requestId));
-                } catch (e) {
-                  handleFirestoreError(
-                    e,
-                    OperationType.DELETE,
-                    `leaveRequests/${requestId}`,
-                  );
-                } finally {
-                  setIsSaving(false);
-                }
+                await safeFirestoreWrite(
+                  () => deleteDoc(doc(db, "leaveRequests", requestId)),
+                  OperationType.DELETE,
+                  `leaveRequests/${requestId}`,
+                  handleFirestoreError,
+                );
+                setIsSaving(false);
               }}
               isSaving={isSaving}
             />
