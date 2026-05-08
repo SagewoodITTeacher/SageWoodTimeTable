@@ -333,7 +333,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[9px] font-black text-gray-400 uppercase">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 uppercase">
                           {req.invigilatorName[0]}
                         </div>
                         <span className="text-xs font-bold text-gray-700">{req.invigilatorName}</span>
@@ -341,7 +341,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[9px] font-black text-curro-blue uppercase">
+                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-black text-curro-blue uppercase">
                           {standbyName[0]}
                         </div>
                         <span className="text-xs font-bold text-gray-700">{standbyName}</span>
@@ -360,12 +360,12 @@ export default function OperationalManager({ user, teachers }: Props) {
                         {req.status === 'COMPLETED' ? (
                           <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
                              <CheckCircle2 className="w-3 h-3" />
-                             <span className="text-[9px] font-black uppercase tracking-tight">Yes</span>
+                             <span className="text-[10px] font-black uppercase tracking-tight">Yes</span>
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 animate-pulse">
                              <Clock className="w-3 h-3" />
-                             <span className="text-[9px] font-black uppercase tracking-tight">No</span>
+                             <span className="text-[10px] font-black uppercase tracking-tight">No</span>
                           </div>
                         )}
                       </div>
@@ -424,7 +424,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                     <tr key={req.id} className={`hover:bg-gray-50/50 transition-colors ${isToday ? 'bg-blue-50/40 ring-1 ring-inset ring-blue-200/50' : ''}`}>
                       <td className="px-5 py-4">
                         <span className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-gray-900'}`}>{format(parseISO(req.date), 'dd MMM yyyy')}</span>
-                        {isToday && <span className="ml-2 bg-blue-600 text-white text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Today</span>}
+                        {isToday && <span className="ml-2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Today</span>}
                       </td>
                       <td className="px-5 py-4">
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${req.isFullDay ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-400'}`}>
@@ -440,7 +440,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                       </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[9px] font-black text-curro-blue uppercase">
+                          <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-black text-curro-blue uppercase">
                             {teacherName[0]}
                           </div>
                           <span className="text-xs font-bold text-gray-700">{teacherName}</span>
@@ -456,17 +456,17 @@ export default function OperationalManager({ user, teachers }: Props) {
                           {req.status === 'APPROVED' ? (
                             <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
                                <CheckCircle2 className="w-3 h-3" />
-                               <span className="text-[9px] font-black uppercase tracking-tight">Approved</span>
+                               <span className="text-[10px] font-black uppercase tracking-tight">Approved</span>
                             </div>
                           ) : req.status === 'DENIED' ? (
                             <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100">
                                <XCircle className="w-3 h-3" />
-                               <span className="text-[9px] font-black uppercase tracking-tight">Denied</span>
+                               <span className="text-[10px] font-black uppercase tracking-tight">Denied</span>
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 animate-pulse">
                                <Clock className="w-3 h-3" />
-                               <span className="text-[9px] font-black uppercase tracking-tight">Pending</span>
+                               <span className="text-[10px] font-black uppercase tracking-tight">Pending</span>
                             </div>
                           )}
                         </div>
@@ -550,7 +550,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                     ${isToday ? 'bg-blue-50/50' : ''} 
                     ${isSun || isHoliday ? 'bg-gray-100/50' : ''}`}
                   >
-                    <span className={`text-[9px] font-black uppercase tracking-tighter ${isSun || isHoliday ? 'text-curro-red/60' : 'text-gray-400'}`}>
+                    <span className={`text-[10px] font-black uppercase tracking-tighter ${isSun || isHoliday ? 'text-curro-red/60' : 'text-gray-400'}`}>
                       {format(date, 'EEE')}
                     </span>
                     <span className={`text-[11px] font-black ${isToday ? 'text-blue-600' : (isSun || isHoliday ? 'text-gray-400' : 'text-gray-900')}`}>
@@ -576,9 +576,9 @@ export default function OperationalManager({ user, teachers }: Props) {
                       <div className="pr-2">
                         <h4 className="text-xs font-black text-gray-900 tracking-tight leading-snug">{normalizeSubjectName(entry.subject)}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Grade {entry.grade}</span>
-                          {pending && <span className="flex items-center gap-1 text-[8px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter animate-pulse"><AlertCircle className="w-2 h-2" /> Pending</span>}
-                          {approved && <span className="flex items-center gap-1 text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter"><CheckCircle2 className="w-2 h-2" /> Ext. +{approved.additionalGreenDays}d</span>}
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Grade {entry.grade}</span>
+                          {pending && <span className="flex items-center gap-1 text-[10px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter animate-pulse"><AlertCircle className="w-2 h-2" /> Pending</span>}
+                          {approved && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full uppercase tracking-tighter"><CheckCircle2 className="w-2 h-2" /> Ext. +{approved.additionalGreenDays}d</span>}
                         </div>
                       </div>
                       <button 
@@ -713,7 +713,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                               <CheckCircle2 className="w-3 h-3" />
                               {format(periods.markingRange.end, 'dd MMM yyyy')}
                             </span>
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">End of Marking Phase</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">End of Marking Phase</span>
                           </div>
                         ) : (
                           <span className="text-xs font-black text-gray-300">-</span>
@@ -725,7 +725,7 @@ export default function OperationalManager({ user, teachers }: Props) {
                             <Plus className="w-3 h-3" />
                             {ext.additionalGreenDays} {ext.additionalGreenDays === 1 ? 'Day' : 'Days'}
                           </span>
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Extension Requested</span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Extension Requested</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -739,19 +739,19 @@ export default function OperationalManager({ user, teachers }: Props) {
                           {ext.status === 'APPROVED' && (
                             <div className="flex flex-col items-center gap-1 text-emerald-600" title="Approved">
                               <ShieldCheck className="w-5 h-5 shadow-sm" />
-                              <span className="text-[8px] font-black uppercase tracking-tighter">Approved</span>
+                              <span className="text-[10px] font-black uppercase tracking-tighter">Approved</span>
                             </div>
                           )}
                           {ext.status === 'DENIED' && (
                             <div className="flex flex-col items-center gap-1 text-red-600" title="Denied">
                               <ShieldAlert className="w-5 h-5 shadow-sm" />
-                              <span className="text-[8px] font-black uppercase tracking-tighter">Denied</span>
+                              <span className="text-[10px] font-black uppercase tracking-tighter">Denied</span>
                             </div>
                           )}
                           {ext.status === 'PENDING' && (
                             <div className="flex flex-col items-center gap-1 text-amber-500 animate-pulse" title="Pending">
                               <AlertCircle className="w-5 h-5 shadow-sm" />
-                              <span className="text-[8px] font-black uppercase tracking-tighter">Pending</span>
+                              <span className="text-[10px] font-black uppercase tracking-tighter">Pending</span>
                             </div>
                           )}
                         </div>
@@ -814,14 +814,14 @@ export default function OperationalManager({ user, teachers }: Props) {
                   </div>
                   <div>
                     <h4 className="text-xs font-black text-gray-900 leading-tight">{t.firstName} {t.lastName}</h4>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{t.id} • {t.roles.includes('WEBMASTER') ? 'WEBMASTER' : t.roles.includes('OPERATIONAL_MANAGER') ? 'OPS' : 'STAFF'}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5">{t.id} • {t.roles.includes('WEBMASTER') ? 'WEBMASTER' : t.roles.includes('OPERATIONAL_MANAGER') ? 'OPS' : 'STAFF'}</p>
                   </div>
                 </div>
                 
                 <button 
                   onClick={() => toggleAdminRole(t)}
                   hidden={t.id === user.id || t.roles.includes('WEBMASTER')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${t.roles.includes('ADMIN') 
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${t.roles.includes('ADMIN') 
                     ? 'bg-curro-red/10 text-curro-red hover:bg-curro-red hover:text-white' 
                     : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}
                 >
@@ -968,7 +968,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ ext, onResolve }) => {
         </div>
         <div className="flex flex-col items-end">
           <span className="text-[14px] font-black text-amber-600">+{ext.additionalGreenDays}d</span>
-          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{format(parseISO(ext.requestDate), 'MMM d, HH:mm')}</span>
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{format(parseISO(ext.requestDate), 'MMM d, HH:mm')}</span>
         </div>
       </div>
       

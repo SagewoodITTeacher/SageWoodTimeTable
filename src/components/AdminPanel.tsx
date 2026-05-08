@@ -625,7 +625,7 @@ const FacultyRow: React.FC<FacultyRowProps> = ({
               </span>
             )}
             {currentTeachingGrade && (
-              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter border border-emerald-100 shrink-0">
+              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter border border-emerald-100 shrink-0">
                 <Circle className="w-1.5 h-1.5 fill-current animate-pulse" />
                 Now Gr {currentTeachingGrade}
               </span>
@@ -712,7 +712,7 @@ const FacultyRow: React.FC<FacultyRowProps> = ({
             className="w-8 bg-transparent text-[10px] font-black text-curro-blue text-right focus:outline-none focus:ring-1 focus:ring-curro-blue rounded border-none p-0"
             title="Workload weighting %"
           />
-          <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">
+          <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
             %
           </span>
         </div>
@@ -1040,7 +1040,7 @@ const InspectionCalendar: React.FC<{
               {weekDayLabels.map((d) => (
                 <div
                   key={d}
-                  className="text-[9px] font-black text-text-muted uppercase tracking-widest text-center py-1"
+                  className="text-[10px] font-black text-text-muted uppercase tracking-widest text-center py-1"
                 >
                   {d}
                 </div>
@@ -1080,31 +1080,31 @@ const InspectionCalendar: React.FC<{
                       <span className="text-[11px] font-black text-text-dark leading-none">
                         {format(d, "d")}
                       </span>
-                      <span className="text-[8px] font-black text-text-muted leading-none">
+                      <span className="text-[10px] font-black text-text-muted leading-none">
                         {total}m
                       </span>
                     </div>
                     <div className="grid grid-cols-2 grid-rows-2 flex-1 gap-px mt-0.5 bg-gray-100">
                       <div
-                        className={`flex items-center justify-center text-[9px] font-black ${bucket.morning > 0 ? "bg-curro-blue text-white" : "bg-blue-50 text-blue-200"}`}
+                        className={`flex items-center justify-center text-[10px] font-black ${bucket.morning > 0 ? "bg-curro-blue text-white" : "bg-blue-50 text-blue-200"}`}
                         title={`Morning: ${bucket.morning} min`}
                       >
                         {bucket.morning || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[9px] font-black ${bucket.afternoon > 0 ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-200"}`}
+                        className={`flex items-center justify-center text-[10px] font-black ${bucket.afternoon > 0 ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-200"}`}
                         title={`Afternoon: ${bucket.afternoon} min`}
                       >
                         {bucket.afternoon || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[9px] font-black ${bucket.tech > 0 ? "bg-curro-red text-white" : "bg-red-50 text-red-200"}`}
+                        className={`flex items-center justify-center text-[10px] font-black ${bucket.tech > 0 ? "bg-curro-red text-white" : "bg-red-50 text-red-200"}`}
                         title={`Tech: ${bucket.tech} min`}
                       >
                         {bucket.tech || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[9px] font-black ${bucket.standby > 0 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-200"}`}
+                        className={`flex items-center justify-center text-[10px] font-black ${bucket.standby > 0 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-200"}`}
                         title={`Standby: ${bucket.standby} min`}
                       >
                         {bucket.standby || ""}
@@ -3041,7 +3041,7 @@ export default function AdminPanel({
               <div className="bg-curro-blue px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-6">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
                       Total Slot Minutes Required
                     </span>
                     <span className="text-lg font-black text-white leading-tight">
@@ -3050,7 +3050,7 @@ export default function AdminPanel({
                   </div>
                   <div className="w-px h-8 bg-white/20" />
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
                       Weighting Units
                     </span>
                     <span className="text-lg font-black text-white leading-tight">
@@ -3059,7 +3059,7 @@ export default function AdminPanel({
                   </div>
                   <div className="w-px h-8 bg-white/20" />
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
                       Min per 100% Load
                     </span>
                     <span className="text-lg font-black text-white leading-tight">
@@ -3069,7 +3069,7 @@ export default function AdminPanel({
                 </div>
                 <div className="hidden lg:flex items-center gap-2 bg-white/10 px-3 py-2 rounded-xl backdrop-blur-sm border border-white/10">
                   <Shield className="w-4 h-4 text-white/80" />
-                  <p className="text-[9px] font-bold text-white/90 uppercase tracking-tight max-w-[150px] leading-tight">
+                  <p className="text-[10px] font-bold text-white/90 uppercase tracking-tight max-w-[150px] leading-tight">
                     Load is balanced dynamically across all faculty based on weighting.
                   </p>
                 </div>
@@ -3158,7 +3158,7 @@ export default function AdminPanel({
                     {leaveRequests.filter((r) => r.status === "PENDING").length}
                     )
                   </h3>
-                  <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest bg-amber-200/50 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest bg-amber-200/50 px-2 py-0.5 rounded-full">
                     Requires Action
                   </span>
                 </div>
@@ -3191,7 +3191,7 @@ export default function AdminPanel({
                                   {req.type}
                                 </span>
                                 {req.reason && (
-                                  <span className="text-[8px] font-medium text-amber-800 italic ml-1">
+                                  <span className="text-[10px] font-medium text-amber-800 italic ml-1">
                                     "{req.reason}"
                                   </span>
                                 )}
@@ -3214,7 +3214,7 @@ export default function AdminPanel({
                                   );
                                 }
                               }}
-                              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95"
                             >
                               Approve
                             </button>
@@ -3233,7 +3233,7 @@ export default function AdminPanel({
                                   );
                                 }
                               }}
-                              className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95"
+                              className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95"
                             >
                               Deny
                             </button>
@@ -3256,34 +3256,34 @@ export default function AdminPanel({
                     <div className="flex bg-gray-200/50 p-1 rounded-xl">
                       <button
                         onClick={() => setAssignmentsSubTab("SUMMARY")}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "SUMMARY" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "SUMMARY" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
                       >
                         Summary
                       </button>
                       <button
                         onClick={() => setAssignmentsSubTab("TABLE")}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "TABLE" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "TABLE" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
                       >
                         Invigilation Table
                       </button>
                     </div>
                     <button
                       onClick={() => setShowStats(true)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-[9px] font-black text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm active:scale-95"
                     >
                       <BarChart2 className="w-3.5 h-3.5" />
                       STATS
                     </button>
                     <button
                       onClick={handleExportAssignmentsCSV}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[9px] font-black text-text-dark hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-text-dark hover:bg-gray-50 transition-all shadow-sm active:scale-95"
                     >
                       <Download className="w-3.5 h-3.5" />
                       EXPORT CSV
                     </button>
                     <button
                       onClick={() => setEnableCheckMode(!enableCheckMode)}
-                      className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-[9px] font-black transition-all shadow-sm active:scale-95 ${
+                      className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-[10px] font-black transition-all shadow-sm active:scale-95 ${
                         enableCheckMode
                           ? "bg-curro-red text-white border-curro-red"
                           : "bg-white text-text-dark border-gray-200 hover:bg-gray-50"
@@ -3295,7 +3295,7 @@ export default function AdminPanel({
                     <button
                       onClick={() => handleEqualize(true)}
                       disabled={isEqualizing || isGenerating}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-curro-blue text-white border border-curro-blue rounded-xl text-[9px] font-black hover:bg-black transition-all shadow-sm active:scale-95"
+                      className="flex items-center gap-2 px-3 py-1.5 bg-curro-blue text-white border border-curro-blue rounded-xl text-[10px] font-black hover:bg-black transition-all shadow-sm active:scale-95"
                     >
                       <Wand2 className="w-3.5 h-3.5" />
                       FIX ERRORS
@@ -3305,7 +3305,7 @@ export default function AdminPanel({
                 {lastUpdatedDate && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-xl">
                     <History className="w-3 h-3 text-curro-blue" />
-                    <span className="text-[9px] font-black text-curro-blue uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest">
                       Last Updated: {format(lastUpdatedDate, "d MMM, HH:mm")}
                     </span>
                   </div>
@@ -3386,7 +3386,7 @@ export default function AdminPanel({
                                 <span className="text-xs font-bold text-text-dark">
                                   {format(parseISO(entry.date), "EEE, d MMM")}
                                 </span>
-                                <span className="text-[9px] text-text-muted font-bold uppercase tracking-tighter">
+                                <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter">
                                   {entry.date}
                                 </span>
                               </div>
@@ -3418,7 +3418,7 @@ export default function AdminPanel({
                                   {venue.name}
                                 </div>
                               ) : (
-                                <span className={`text-[9px] font-bold uppercase italic ${venueId === "GRADE" ? "text-blue-600" : "text-amber-600"}`}>
+                                <span className={`text-[10px] font-bold uppercase italic ${venueId === "GRADE" ? "text-blue-600" : "text-amber-600"}`}>
                                   {venueId === "GRADE" ? `Grade ${entry.grade} Standby` : (venueId === "manual" ? "Manual Slot" : "No Venue Set")}
                                 </span>
                               )}
@@ -3435,7 +3435,7 @@ export default function AdminPanel({
                                     return (
                                       <div
                                         key={tid}
-                                        className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter border transition-all ${
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter border transition-all ${
                                           hasConflict 
                                             ? "bg-curro-red text-white border-curro-red animate-pulse scale-110 shadow-lg" 
                                             : "bg-gray-100 text-text-dark border-gray-200"
@@ -3447,7 +3447,7 @@ export default function AdminPanel({
                                     );
                                   })
                                 ) : (
-                                  <span className="text-[9px] text-text-muted opacity-50 uppercase font-bold italic">
+                                  <span className="text-[10px] text-text-muted opacity-50 uppercase font-bold italic">
                                     Unassigned
                                   </span>
                                 )}
@@ -3456,7 +3456,7 @@ export default function AdminPanel({
                             <td className="px-5 py-4 text-right">
                               <button
                                 onClick={() => setActiveTab("SCHEDULER")}
-                                className="text-curro-blue font-black text-[9px] uppercase tracking-widest hover:bg-curro-blue hover:text-white px-2 py-1.5 rounded-lg border border-blue-100 transition-all active:scale-95 bg-blue-50/50"
+                                className="text-curro-blue font-black text-[10px] uppercase tracking-widest hover:bg-curro-blue hover:text-white px-2 py-1.5 rounded-lg border border-blue-100 transition-all active:scale-95 bg-blue-50/50"
                               >
                                 {assignedStaffIds.length > 0 ? "EDIT" : "SCHEDULE"}
                               </button>
@@ -3592,7 +3592,7 @@ export default function AdminPanel({
                                   <span className={`text-[10px] font-black uppercase tracking-tighter ${isDarkBg ? 'text-white' : 'text-curro-blue'}`}>
                                     Grade {row.grade}
                                   </span>
-                                  <span className="text-[9px] font-bold uppercase">
+                                  <span className="text-[10px] font-bold uppercase">
                                     {row.subject}
                                   </span>
                                 </div>
@@ -3605,7 +3605,7 @@ export default function AdminPanel({
                                   <span className={`text-[10px] font-black uppercase ${isDarkBg ? 'text-white' : 'text-emerald-600'}`}>
                                     {row.periodLabel}
                                   </span>
-                                  <span className={`text-[8px] font-mono font-bold ${isDarkBg ? 'text-white/80' : 'text-text-muted'}`}>
+                                  <span className={`text-[10px] font-mono font-bold ${isDarkBg ? 'text-white/80' : 'text-text-muted'}`}>
                                     {row.periodTime}
                                   </span>
                                 </div>
@@ -3616,7 +3616,7 @@ export default function AdminPanel({
                                 {isWarning && <Zap className="w-3 h-3 text-white" />}
                               </td>
                               <td className="px-5 py-4">
-                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${
                                   isDarkBg ? 'bg-white/20 text-white border-white/30' :
                                   isScattered ? 'bg-cyan-500/20 text-cyan-700 border-cyan-500/30' :
                                   'bg-rose-500/20 text-rose-700 border-rose-500/30'
@@ -3782,17 +3782,17 @@ export default function AdminPanel({
                       return (
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-300">
                           {teacher.hallPass && (
-                            <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase tracking-widest rounded border border-amber-500/30 flex items-center gap-1">
+                            <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-[10px] font-black uppercase tracking-widest rounded border border-amber-500/30 flex items-center gap-1">
                               <ShieldCheck className="w-3 h-3" /> [Hall Pass]
                             </span>
                           )}
-                          <span className={`px-2 py-1 ${teacher.invigilationPreference === 'SCATTERED' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : teacher.invigilationPreference === 'OPS' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'} text-[9px] font-black uppercase tracking-widest rounded border flex items-center gap-1`}>
+                          <span className={`px-2 py-1 ${teacher.invigilationPreference === 'SCATTERED' ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : teacher.invigilationPreference === 'OPS' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'} text-[10px] font-black uppercase tracking-widest rounded border flex items-center gap-1`}>
                             {teacher.invigilationPreference === 'SCATTERED' ? <Zap className="w-3 h-3" /> : teacher.invigilationPreference === 'OPS' ? <ShieldCheck className="w-3 h-3" /> : <Clock3 className="w-3 h-3" />}
                             {teacher.invigilationPreference || 'SCATTERED'}
                           </span>
                           
                           {teacher.invigilationPreference === 'OPS' && teacherAssignments.length > 0 && (
-                            <span className="px-2 py-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest rounded shadow-lg animate-pulse flex items-center gap-1">
+                            <span className="px-2 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded shadow-lg animate-pulse flex items-center gap-1">
                               <ShieldAlert className="w-3 h-3" /> [Duty Violation: OPS Staff]
                             </span>
                           )}
@@ -3835,7 +3835,7 @@ export default function AdminPanel({
                                   }
                                 },
                               })}
-                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-widest rounded shadow-sm flex items-center gap-1 transition-all"
+                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest rounded shadow-sm flex items-center gap-1 transition-all"
                             >
                               <Trash2 className="w-3 h-3" /> Remove Duplicates
                             </button>
@@ -4039,7 +4039,7 @@ export default function AdminPanel({
                                   <td className="px-6 py-4">
                                     <div className="flex flex-col text-inherit">
                                       <span className="text-xs font-black">{format(parseISO(row!.date), "dd MMM yyyy")}</span>
-                                      <span className={`text-[9px] font-bold uppercase tracking-tighter ${rowBgClass.includes('text-white') ? 'text-white/80' : 'text-text-muted'}`}>{format(parseISO(row!.date), "EEEE")}</span>
+                                      <span className={`text-[10px] font-bold uppercase tracking-tighter ${rowBgClass.includes('text-white') ? 'text-white/80' : 'text-text-muted'}`}>{format(parseISO(row!.date), "EEEE")}</span>
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 text-xs font-mono font-bold">{row!.startTime}</td>
@@ -4352,7 +4352,7 @@ function TimetableModal({
                     <span className="text-[10px] font-black text-curro-blue">
                       {p.label}
                     </span>
-                    <span className="text-[9px] font-mono font-bold text-text-muted leading-none">
+                    <span className="text-[10px] font-mono font-bold text-text-muted leading-none">
                       {p.start}
                     </span>
                   </div>
@@ -4652,7 +4652,7 @@ function AddTeacherModal({
               }
               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-black focus:ring-2 focus:ring-curro-blue outline-none"
             />
-            <p className="text-[9px] text-text-muted mt-1 px-1 italic">
+            <p className="text-[10px] text-text-muted mt-1 px-1 italic">
               100% is standard full-time load.
             </p>
           </div>
@@ -4720,7 +4720,7 @@ function EditTeacherModal({
               }
               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
             />
-            <p className="text-[9px] text-text-muted mt-1 px-1 italic">
+            <p className="text-[10px] text-text-muted mt-1 px-1 italic">
               When a user logs in with this email, they will be linked to this
               staff profile.
             </p>
@@ -4775,7 +4775,7 @@ function EditTeacherModal({
               }
               className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-black focus:ring-2 focus:ring-curro-blue outline-none"
             />
-            <p className="text-[9px] text-text-muted mt-1 px-1 italic">
+            <p className="text-[10px] text-text-muted mt-1 px-1 italic">
               100% is standard full-time load.
             </p>
           </div>
@@ -5276,11 +5276,11 @@ function LeaveRequestModal({
                       } group`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                           {req.type}
                         </span>
                         <div
-                          className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter ${
+                          className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
                             req.status === "APPROVED"
                               ? "bg-emerald-100 text-emerald-700"
                               : req.status === "DENIED"
@@ -5571,7 +5571,7 @@ function ExamTimetableTab({
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">
                 Series Workload{" "}
-                <span className="text-[8px] opacity-60">({currentSeries})</span>
+                <span className="text-[10px] opacity-60">({currentSeries})</span>
               </span>
               <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl border border-white/10">
                 <BookOpen className="w-3.5 h-3.5 text-white/60" />
@@ -5620,7 +5620,7 @@ function ExamTimetableTab({
                 />
                 <button
                   onClick={toggleLock}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                     isLocked
                       ? "bg-amber-500 text-white shadow-lg"
                       : "bg-white/20 text-white hover:bg-white/30"
@@ -5681,7 +5681,7 @@ function ExamTimetableTab({
                                   )
                                 }
                                 disabled={isLocked}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
                                   mode === "SIMULTANEOUS"
                                     ? "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                                     : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
@@ -5699,7 +5699,7 @@ function ExamTimetableTab({
                           return null;
                         })()}
                       </div>
-                      <span className="text-[8px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
+                      <span className="text-[10px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
                         Start: 08:20 (Arrive 07:50 / 07:30 Gr12)
                       </span>
                     </div>
@@ -5835,7 +5835,7 @@ function ExamTimetableTab({
                                   )
                                 }
                                 disabled={isLocked}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
+                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
                                   mode === "SIMULTANEOUS"
                                     ? "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
                                     : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
@@ -5853,7 +5853,7 @@ function ExamTimetableTab({
                           return null;
                         })()}
                       </div>
-                      <span className="text-[8px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
+                      <span className="text-[10px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
                         Start: 13:20 (Arrive 12:50 / 12:30 Gr12)
                       </span>
                     </div>
@@ -6050,7 +6050,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
       <div className="flex flex-col gap-3">
         <div className="flex gap-2">
           <div className="flex-1 flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Subject
             </label>
             <select
@@ -6071,7 +6071,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
             </select>
           </div>
           <div className="w-32 flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Type
             </label>
             <select
@@ -6091,7 +6091,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
 
         <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Duration (Min)
             </label>
             <input
@@ -6104,7 +6104,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Boys
             </label>
             <input
@@ -6117,7 +6117,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Girls
             </label>
             <input
@@ -6130,7 +6130,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
             />
           </div>
           <div className="flex flex-col">
-            <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
               Total
             </label>
             <div className="w-full bg-blue-50 border border-blue-100 text-blue-600 rounded-xl px-3 py-2 text-xs font-black flex items-center justify-center">
@@ -6141,7 +6141,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
 
         {grade === 12 &&
           !paperType?.toLowerCase().includes("prac") && (
-            <div className="mt-1 text-[9px] font-black text-curro-red uppercase tracking-tight flex items-center gap-1.5 bg-red-50 p-2 rounded-xl border border-red-100 italic">
+            <div className="mt-1 text-[10px] font-black text-curro-red uppercase tracking-tight flex items-center gap-1.5 bg-red-50 p-2 rounded-xl border border-red-100 italic">
               <Building2 className="w-3 h-3" />
               Hall / Assembly Required for Grade 12
             </div>
@@ -6149,7 +6149,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
       </div>
 
       <div className="flex flex-col gap-1.5 px-1">
-        <label className="text-[9px] font-black text-text-muted uppercase tracking-widest ml-1">
+        <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
           Assigned Venues (Max 8)
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -6175,7 +6175,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
 
       <div className="flex items-center justify-between mt-1">
         <div className="flex flex-col">
-          <label className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
+          <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1 ml-1">
             Staff Restricted
           </label>
           <div className="flex flex-wrap gap-1">
@@ -6189,7 +6189,7 @@ const TimetableField: React.FC<TimetableFieldProps> = ({
                 </span>
               ))
             ) : (
-              <span className="text-[10px] font-bold text-text-muted italic opacity-50 text-[8px]">
+              <span className="text-[10px] font-bold text-text-muted italic opacity-50 text-[10px]">
                 No matches...
               </span>
             )}
@@ -6360,7 +6360,7 @@ function VenuesTab({
                         <span className="text-xs font-mono font-bold text-text-dark">
                           {venue.capacity}
                         </span>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                           Learners
                         </span>
                       </div>
@@ -6369,7 +6369,7 @@ function VenuesTab({
                         <span className="text-xs font-mono font-bold text-curro-blue">
                           ID: {venue.id}
                         </span>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-widest">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                           Static Code
                         </span>
                       </div>
@@ -7028,13 +7028,13 @@ function SchedulerTab({
             </motion.div>
           )}
           <div className="flex gap-2 mt-1">
-            <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-emerald-100">
+            <span className="bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-emerald-100">
               Morning: Start 08:20 (Staff 07:50)
             </span>
-            <span className="bg-curro-red bg-opacity-5 text-curro-red text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-curro-red border-opacity-10">
+            <span className="bg-curro-red bg-opacity-5 text-curro-red text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-curro-red border-opacity-10">
               Afternoon: Start 13:20 (Staff 12:50)
             </span>
-            <span className="bg-amber-50 text-amber-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-100">
+            <span className="bg-amber-50 text-amber-600 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-100">
               Grade 12 Hall: Staff 07:30 / 12:30
             </span>
           </div>
@@ -7062,7 +7062,7 @@ function SchedulerTab({
                   </label>
                   {hasIncompleteVenues && (
                     <div className="flex items-center gap-1">
-                      <span className="text-[8px] font-black text-curro-red bg-red-50 px-2 py-0.5 rounded-full animate-pulse border border-red-100">
+                      <span className="text-[10px] font-black text-curro-red bg-red-50 px-2 py-0.5 rounded-full animate-pulse border border-red-100">
                         Venues missing
                       </span>
                       <button
@@ -7154,7 +7154,7 @@ function SchedulerTab({
                 <button
                   onClick={handleEqualize}
                   disabled={isGenerating || isEqualizing}
-                  className="bg-emerald-600 text-white rounded-xl px-3 py-1 font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-1.5"
+                  className="bg-emerald-600 text-white rounded-xl px-3 py-1 font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-1.5"
                 >
                   <Scale className="w-2.5 h-2.5" />
                   Equalize
@@ -7162,14 +7162,14 @@ function SchedulerTab({
                 <button
                   onClick={() => handleEqualize(true)}
                   disabled={isGenerating || isEqualizing}
-                  className="bg-curro-blue text-white rounded-xl px-3 py-1 font-black text-[9px] uppercase tracking-widest shadow-lg hover:bg-black transition-all active:scale-95 flex items-center gap-1.5"
+                  className="bg-curro-blue text-white rounded-xl px-3 py-1 font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-black transition-all active:scale-95 flex items-center gap-1.5"
                 >
                   <Wand2 className="w-2.5 h-2.5" />
                   Fix errors & Balance
                 </button>
                 <button
                   onClick={() => setIsConfiguringPeriods(true)}
-                  className="text-[9px] font-black text-curro-blue uppercase tracking-widest hover:underline flex items-center gap-1"
+                  className="text-[10px] font-black text-curro-blue uppercase tracking-widest hover:underline flex items-center gap-1"
                 >
                   <Settings className="w-2.5 h-2.5" />
                   Configure Periods
@@ -7219,7 +7219,7 @@ function SchedulerTab({
                   ) : (
                     <ShieldAlert className="w-3 h-3" />
                   )}
-                  <span className="text-[8px] font-black uppercase whitespace-nowrap">
+                  <span className="text-[10px] font-black uppercase whitespace-nowrap">
                     {dayPeriodConfigs.find((c) => c.id === selectedDate)
                       ?.venuesOverridden
                       ? "Overridden"
@@ -7490,7 +7490,7 @@ function SchedulerTab({
                         : venuesRequired}
                     </span>
                     <div className="flex flex-col items-start">
-                      <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">
+                      <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">
                         {assignedVenues.some(
                           (v) =>
                             v.name?.toLowerCase().includes("hall") ||
@@ -7533,7 +7533,7 @@ function SchedulerTab({
                           assignedVenues.map((v) => (
                             <span
                               key={v.id}
-                              className="text-[9px] font-black text-curro-blue bg-blue-50 px-1.5 py-0.5 rounded"
+                              className="text-[10px] font-black text-curro-blue bg-blue-50 px-1.5 py-0.5 rounded"
                             >
                               {v.name}
                             </span>
@@ -7547,7 +7547,7 @@ function SchedulerTab({
                     </div>
 
                     <div className="pt-4 border-t border-gray-50 flex flex-col gap-3">
-                      <label className="text-[9px] font-black text-text-muted uppercase tracking-widest">
+                      <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                         Assign Venues
                       </label>
                       <div className="flex flex-wrap gap-1.5 justify-center">
@@ -7562,7 +7562,7 @@ function SchedulerTab({
                             <button
                               key={v.id}
                               onClick={() => handleToggleVenue(v.id)}
-                              className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
+                              className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 ${
                                 isAssigned
                                   ? "bg-curro-blue text-white shadow-lg shadow-blue-500/20 scale-105 ring-2 ring-blue-100"
                                   : isOccupiedElsewhere
@@ -7589,7 +7589,7 @@ function SchedulerTab({
                       )}
 
                       <div className="flex flex-col gap-4">
-                        <label className="text-[9px] font-black text-text-muted uppercase tracking-widest text-left ml-1">
+                        <label className="text-[10px] font-black text-text-muted uppercase tracking-widest text-left ml-1">
                           Period Allocation
                         </label>
                         <div className="space-y-4">
@@ -7597,7 +7597,7 @@ function SchedulerTab({
                             return (
                               <div key={pIdx} className="space-y-1.5">
                                 <div className="flex items-center gap-2 px-1">
-                                  <span className="text-[9px] font-black text-curro-blue uppercase tracking-widest">
+                                  <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest">
                                     {activePeriods[pIdx]?.label}
                                   </span>
                                   <div className="h-px flex-1 bg-gray-100" />
@@ -7698,7 +7698,7 @@ function SchedulerTab({
                                               </button>
                                             </>
                                           ) : (
-                                            <span className="text-[8px] font-bold opacity-30 italic">
+                                            <span className="text-[10px] font-bold opacity-30 italic">
                                               Unassigned
                                             </span>
                                           )}
@@ -7865,7 +7865,7 @@ function SchedulerTab({
                                                   </button>
                                                 </>
                                               ) : (
-                                                <span className="text-[8px] font-bold opacity-30 italic">
+                                                <span className="text-[10px] font-bold opacity-30 italic">
                                                   Unassigned
                                                 </span>
                                               )}
@@ -7891,7 +7891,7 @@ function SchedulerTab({
                         <Users className="w-4 h-4" />
                         Invigilation Staff
                       </h5>
-                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">
                         Scheduled to Grade
                       </span>
                     </div>
@@ -7900,7 +7900,7 @@ function SchedulerTab({
                       {/* Priority: Technical Staff for Prac */}
                       {isPrac && techTeachers.length > 0 && (
                         <div className="space-y-2 mb-6">
-                          <span className="text-[8px] font-black text-purple-500 uppercase tracking-widest ml-1">
+                          <span className="text-[10px] font-black text-purple-500 uppercase tracking-widest ml-1">
                             Technical Staff {techTeachers.some(ts => ts.isEntrySpecialist) ? "& Specialists" : "(Restricted)"}
                           </span>
                         {techTeachers.map((ts) => {
@@ -7972,7 +7972,7 @@ function SchedulerTab({
                                     {t.firstName} {t.lastName}
                                   </span>
                                   <div className="flex items-center gap-2">
-                                    <span className={`text-[8px] font-black uppercase tracking-widest ${isAssigned ? "text-blue-100" : isSpecialist ? "text-pink-600" : "text-purple-600/60"}`}>
+                                    <span className={`text-[10px] font-black uppercase tracking-widest ${isAssigned ? "text-blue-100" : isSpecialist ? "text-pink-600" : "text-purple-600/60"}`}>
                                       {isAssigned ? "Assigned" : isUsed ? "Occupied" : isSpecialist ? "Technical Specialist" : "Subject Specialist"}
                                     </span>
                                     {isBlockedByBreak && (
@@ -8057,10 +8057,10 @@ function SchedulerTab({
                                     <span className={`text-xs font-bold ${isAssigned || hasConflict ? "text-white" : "text-text-dark"}`}>
                                       {t.firstName} {t.lastName}
                                       {t.invigilationPreference === "MARATHON" && (
-                                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-orange-100 text-orange-700 rounded-full text-[8px] font-black" title="Marathon Teacher">M</span>
+                                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-orange-100 text-orange-700 rounded-full text-[10px] font-black" title="Marathon Teacher">M</span>
                                       )}
                                       {t.invigilationPreference === "SCATTERED" && (
-                                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-sky-100 text-sky-700 rounded-full text-[8px] font-black" title="Scattered Teacher">S</span>
+                                        <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 bg-sky-100 text-sky-700 rounded-full text-[10px] font-black" title="Scattered Teacher">S</span>
                                       )}
                                     </span>
                                     {isAssigned && (
@@ -8098,7 +8098,7 @@ function SchedulerTab({
                                     {primaryFor.map((pIdx) => (
                                       <span
                                         key={pIdx}
-                                        className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-emerald-100 text-emerald-700"}`}
+                                        className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-emerald-100 text-emerald-700"}`}
                                       >
                                         {activePeriods[pIdx]?.label}
                                       </span>
@@ -8126,7 +8126,7 @@ function SchedulerTab({
                       <Clock className="w-4 h-4" />
                       Reserve Selection
                     </h5>
-                    <span className="text-[9px] font-bold text-curro-red bg-red-50 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-curro-red bg-red-50 px-2 py-0.5 rounded-full">
                       FREE PERIODS
                     </span>
                   </div>
@@ -8212,7 +8212,7 @@ function SchedulerTab({
                                       HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
                                     </span>
                                   )}
-                                  <span className={`text-[9px] font-black ${isAssigned || hasConflict ? "text-white/60" : "text-text-muted opacity-50"}`}>
+                                  <span className={`text-[10px] font-black ${isAssigned || hasConflict ? "text-white/60" : "text-text-muted opacity-50"}`}>
                                     {t.id}
                                   </span>
                                 </div>
@@ -8220,7 +8220,7 @@ function SchedulerTab({
                                   {freeFor.map((pIdx) => (
                                     <span
                                       key={pIdx}
-                                      className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-red-100 text-red-600"}`}
+                                      className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-red-100 text-red-600"}`}
                                     >
                                       {activePeriods[pIdx]?.label}
                                     </span>
@@ -8357,7 +8357,7 @@ function SchedulerTab({
                 </div>
               </div>
 
-              <p className="mt-8 text-[9px] font-bold text-text-muted opacity-50 uppercase tracking-widest">
+              <p className="mt-8 text-[10px] font-bold text-text-muted opacity-50 uppercase tracking-widest">
                 Please do not close or refresh this tab
               </p>
             </div>
@@ -8408,7 +8408,7 @@ function PeriodConfigModal({
                 </div>
                 <div className="flex-1 grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-black text-text-muted uppercase tracking-widest ml-1">
+                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                       Start
                     </label>
                     <input
@@ -8423,7 +8423,7 @@ function PeriodConfigModal({
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[9px] font-black text-text-muted uppercase tracking-widest ml-1">
+                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                       End
                     </label>
                     <input
@@ -8439,7 +8439,7 @@ function PeriodConfigModal({
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1 min-w-[60px]">
-                  <label className="text-[9px] font-black text-text-muted uppercase tracking-widest">
+                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                     Break
                   </label>
                   <button
@@ -8900,7 +8900,7 @@ function SubjectsTab({
                 <Users className="w-3 h-3" />
                 Extracted from Faculty Profiles
               </h4>
-              <p className="text-[9px] text-text-muted italic mb-6 ml-1">
+              <p className="text-[10px] text-text-muted italic mb-6 ml-1">
                 These are the subjects currently defined in the faculty member
                 profiles. Use the sync button above to import missing ones into
                 the master registry.
@@ -8928,7 +8928,7 @@ function SubjectsTab({
                           {name}
                         </span>
                         {isInMaster && (
-                          <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1">
+                          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1">
                             <CheckCircle2 className="w-2.5 h-2.5" /> IN MASTER
                           </span>
                         )}

@@ -380,7 +380,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
               <Clock className="w-3.5 h-3.5 text-curro-blue" />
               Your Daily View
             </h3>
-            <span className="bg-curro-blue/10 text-curro-blue px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter">
+            <span className="bg-curro-blue/10 text-curro-blue px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">
               {totalItems} Tasks
             </span>
           </div>
@@ -412,7 +412,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                         <span className={`text-sm font-black font-mono ${isCurrent ? 'text-curro-blue' : 'text-text-dark'}`}>
                           {item.time}
                         </span>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">
                           {item.label}
                         </span>
                         <div className="w-10 h-px bg-gray-100 my-1.5" />
@@ -432,15 +432,15 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                           {item.subject} {item.type === 'period' && item.paperType !== 'Normal' ? `(${item.paperType})` : ''}
                         </h4>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isCurrent ? 'bg-curro-blue text-white border-curro-blue' : 'bg-curro-blue/10 text-curro-blue border-curro-blue/10'}`}>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isCurrent ? 'bg-curro-blue text-white border-curro-blue' : 'bg-curro-blue/10 text-curro-blue border-curro-blue/10'}`}>
                             Grade {item.grade}
                           </span>
                           {item.type === 'period' ? (
-                            <span className="text-[8px] font-black bg-gray-100 text-text-muted px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                            <span className="text-[10px] font-black bg-gray-100 text-text-muted px-1.5 py-0.5 rounded uppercase tracking-tighter">
                               {item.session}
                             </span>
                           ) : (
-                            <span className="text-[8px] font-black text-white bg-curro-blue px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                            <span className="text-[10px] font-black text-white bg-curro-blue px-2 py-0.5 rounded-full uppercase tracking-tighter">
                               {/* @ts-ignore */}
                               {item.status}
                             </span>
@@ -471,7 +471,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
             </div>
             {nextInvigilatorName && (
               <div className="text-right">
-                <span className="text-[8px] font-black text-curro-blue uppercase tracking-widest block">Next Takeover</span>
+                <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest block">Next Takeover</span>
                 <span className="text-[10px] font-black text-text-dark">{nextInvigilatorName}</span>
               </div>
             )}
@@ -480,7 +480,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
           {/* Progress Bar */}
           <div className="mb-4">
             <div className="flex justify-between items-end mb-1.5">
-              <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Session Progress</span>
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Session Progress</span>
               <span className={`text-[10px] font-black font-mono ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`}>
                 {Math.round(progressPercent)}%
               </span>
@@ -500,7 +500,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
             <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <MapPin className={`w-3 h-3 ${currentActivity ? 'text-curro-red' : 'text-gray-400'}`} />
-                <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">Current Venue</span>
+                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Current Venue</span>
               </div>
               <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
                 {currentActivity?.venueName || 'None Active'}
@@ -509,7 +509,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
             <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <User className={`w-3 h-3 ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`} />
-                <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">Standby Support</span>
+                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Standby Support</span>
               </div>
               <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
                 {/* @ts-ignore */}
@@ -672,7 +672,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
 
       {/* Footer */}
       <div className="px-5 py-10 text-center opacity-40">
-        <p className="text-[9px] font-black text-text-muted uppercase tracking-[0.3em]">
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em]">
           Curro South Africa • Invigilation Systems
         </p>
       </div>

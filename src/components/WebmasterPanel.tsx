@@ -62,7 +62,7 @@ export default function WebmasterPanel({ user, teachers }: Props) {
               <div className="p-2 bg-white/5 rounded-lg group-hover:bg-orange-500/20 group-hover:text-orange-500 transition-colors">
                 <stat.icon className="w-4 h-4 text-gray-400 group-hover:text-inherit" />
               </div>
-              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                 stat.status === 'Healthy' || stat.status === 'Optimal' || stat.status === 'Stable' 
                   ? 'bg-emerald-500/10 text-emerald-500' 
                   : 'bg-amber-500/10 text-amber-500'
