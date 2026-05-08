@@ -28,3 +28,78 @@
 .status-yellow { @apply bg-amber-100 text-amber-700; }
 .status-gray { @apply bg-gray-100 text-text-muted; }
 
+/* -------------------------------------------------------------------------- */
+/* Animations referenced in JSX (UX_DESIGN_REVIEW.md #13)                      */
+/* These are intentionally hand-rolled to avoid pulling tailwindcss-animate.   */
+/* Respect prefers-reduced-motion: see Plan 8 for the global gate.             */
+/* -------------------------------------------------------------------------- */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+@keyframes pulse-slow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(227, 27, 35, 0.45); }
+  50%      { box-shadow: 0 0 0 12px rgba(227, 27, 35, 0); }
+}
+.animate-pulse-slow { animation: pulse-slow 2.2s ease-in-out infinite; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-in-from-bottom-4 {
+  from { transform: translateY(1rem); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes slide-in-from-top-4 {
+  from { transform: translateY(-1rem); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+@keyframes slide-in-from-top-2 {
+  from { transform: translateY(-0.5rem); opacity: 0; }
+  to   { transform: translateY(0);       opacity: 1; }
+}
+@keyframes slide-in-from-right-2 {
+  from { transform: translateX(0.5rem); opacity: 0; }
+  to   { transform: translateX(0);      opacity: 1; }
+}
+
+/*
+ * Composite "animate-in" utility: when present, runs every sibling
+ * keyframe class declared on the same element. Mirrors tailwindcss-animate.
+ */
+.animate-in {
+  animation-duration: var(--tw-enter-duration, 250ms);
+  animation-timing-function: var(--tw-enter-ease, cubic-bezier(0.16, 1, 0.3, 1));
+  animation-fill-mode: both;
+}
+.animate-in.fade-in              { animation-name: fade-in; }
+.animate-in.slide-in-from-bottom-4 { animation-name: slide-in-from-bottom-4; }
+.animate-in.slide-in-from-top-4    { animation-name: slide-in-from-top-4; }
+.animate-in.slide-in-from-top-2    { animation-name: slide-in-from-top-2; }
+.animate-in.slide-in-from-right-2  { animation-name: slide-in-from-right-2; }
+
+/* When two keyframe modifiers stack (e.g. fade-in slide-in-from-bottom-4),
+   only the last declared name wins; that is correct for the existing usage
+   patterns where translation is the dominant effect. */
+
+/* Tailwind v4 already maps duration-300/500/700 to --tw-enter-duration via
+   .duration-* utilities, so combining `animate-in fade-in duration-500` works
+   as expected. */
+
+/* -------------------------------------------------------------------------- */
+/* prefers-reduced-motion: disable all animations and transitions             */
+/* -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

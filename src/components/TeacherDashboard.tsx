@@ -1,22 +1,30 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Teacher, ExamSession, Assignment, TimetableEntry, Venue, LeaveRequest, HelpOption, HelpRequest } from '../types';
+import { Teacher, LeaveRequest, HelpOption, HelpRequest } from '../types';
 import { format, parseISO, isSameDay, isWednesday, addMinutes } from 'date-fns';
 import { normalizeSubjectName, PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Clock, Calendar, Search, AlertCircle, Plus, X, Send, Info, Bell, MessageSquare, PhoneCall, Zap, User } from 'lucide-react';
+import { MapPin, Clock, Calendar, Search, AlertCircle, Plus, X, Send, Info, Bell, MessageSquare, PhoneCall, Zap, User, CheckCircle2 } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { Modal, useToast } from './ui';
+import { useSessions } from '../hooks/useSessions';
+import { useAssignments } from '../hooks/useAssignments';
+import { useTimetableEntries } from '../hooks/useTimetableEntries';
+import { useVenues } from '../hooks/useVenues';
 
 interface Props {
   user: Teacher;
-  sessions: ExamSession[];
-  assignments: Assignment[];
-  entries: TimetableEntry[];
-  venues: Venue[];
   teachers: Teacher[];
 }
 
-export default function TeacherDashboard({ user, sessions, assignments, entries, venues, teachers }: Props) {
+export default function TeacherDashboard({ user, teachers }: Props) {
+  const { data: sessions } = useSessions();
+  const { data: assignments } = useAssignments();
+  const { data: entries } = useTimetableEntries();
+  const { data: venues } = useVenues();
+  const toast = useToast();
+  const [leaveFormError, setLeaveFormError] = useState<string | null>(null);
+  const [helpFormError, setHelpFormError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +50,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Listen for help requests where user is the standby
   useEffect(() => {
-    if (!user.id) return;
+    if (!user.id) {return;}
 
     const q = query(
       collection(db, 'helpRequests'),
@@ -56,10 +64,11 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       if (requests.length > 0) {
         // Show the newest pending notification
         setActiveNotification(requests[0]);
-        // Play beep sound
+        // Play beep sound and surface a visual toast in case audio is blocked/muted
         if (audioRef.current) {
           audioRef.current.play().catch(e => console.warn("Audio play blocked", e));
         }
+        toast.info(`Help requested at ${requests[0].venueName}: ${requests[0].option}`, { duration: 6000 });
       } else {
         setActiveNotification(null);
       }
@@ -84,10 +93,13 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       });
       setIsLeaveModalOpen(false);
       setLeaveReason('');
-      alert('Leave request submitted successfully!');
+      toast.success("Leave request submitted successfully");
+      setLeaveFormError(null);
     } catch (error) {
       console.error('Error submitting leave:', error);
-      alert('Failed to submit leave request.');
+      const message = "Failed to submit leave request. Please try again.";
+      setLeaveFormError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -114,24 +126,24 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   };
 
   const mySchedule = entries.filter(entry => {
-    if (entry.date !== selectedDate) return false;
-    if (!entry.invigilatorAssignments) return false;
+    if (entry.date !== selectedDate) {return false;}
+    if (!entry.invigilatorAssignments) {return false;}
     return Object.entries(entry.invigilatorAssignments).some(([key, tid]) => {
-      if (tid !== user.id) return false;
+      if (tid !== user.id) {return false;}
       const vId = key.split('_')[1];
       const role = key.split('_')[2];
       const isStandby = vId === 'GRADE' || role === 'STANDBY';
-      if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) return false;
+      if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) {return false;}
       return true;
     });
   }).flatMap(entry => {
     const myAssignments = Object.entries(entry.invigilatorAssignments || {})
       .filter(([key, tid]) => {
-        if (tid !== user.id) return false;
+        if (tid !== user.id) {return false;}
         const vId = key.split('_')[1];
         const role = key.split('_')[2];
         const isStandby = vId === 'GRADE' || role === 'STANDBY';
-        if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) return false;
+        if (!isStandby && entry.venueIds && !entry.venueIds.includes(vId)) {return false;}
         return true;
       })
       .map(([key, _]) => {
@@ -239,7 +251,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Find who takes over in the current venue next period
   const nextInvigilatorName = useMemo(() => {
-    if (!currentActivity || currentActivity.type !== 'period') return null;
+    if (!currentActivity || currentActivity.type !== 'period') {return null;}
     const nextPeriodIdx = (currentActivity as any).pIdx + 1;
     const currentVenueId = (currentActivity as any).vId;
     
@@ -259,7 +271,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
   // Progress Bar Calculation
   const progressPercent = useMemo(() => {
-    if (!currentActivity) return 0;
+    if (!currentActivity) {return 0;}
     const [startH, startM] = currentActivity.time.split(':').map(Number);
     const [endH, endM] = currentActivity.endTime.split(':').map(Number);
     const startTotal = startH * 60 + startM;
@@ -272,7 +284,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   }, [currentActivity, now]);
 
   const handleCallHelp = async () => {
-    if (!currentActivity || !selectedHelpOption) return;
+    if (!currentActivity || !selectedHelpOption) {return;}
 
     setIsSubmitting(true);
     try {
@@ -294,7 +306,9 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       setQpQuantity(1);
     } catch (error) {
       console.error('Error calling for help:', error);
-      alert('Failed to send help request.');
+      const message = "Failed to send help request. Try the call button again.";
+      setHelpFormError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -316,7 +330,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
   return (
     <div className="flex flex-col pb-12 overflow-x-hidden">
       {/* Hidden audio for notifications */}
-      <audio ref={audioRef} src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto" />
+      <audio ref={audioRef} src="/sounds/help-alert.mp3" preload="auto" />
 
       {/* Salutation Header */}
       <motion.div 
@@ -366,7 +380,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
               <Clock className="w-3.5 h-3.5 text-curro-blue" />
               Your Daily View
             </h3>
-            <span className="bg-curro-blue/10 text-curro-blue px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter">
+            <span className="bg-curro-blue/10 text-curro-blue px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">
               {totalItems} Tasks
             </span>
           </div>
@@ -398,7 +412,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                         <span className={`text-sm font-black font-mono ${isCurrent ? 'text-curro-blue' : 'text-text-dark'}`}>
                           {item.time}
                         </span>
-                        <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">
+                        <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">
                           {item.label}
                         </span>
                         <div className="w-10 h-px bg-gray-100 my-1.5" />
@@ -418,15 +432,15 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                           {item.subject} {item.type === 'period' && item.paperType !== 'Normal' ? `(${item.paperType})` : ''}
                         </h4>
                         <div className="mt-1 flex items-center gap-2">
-                          <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isCurrent ? 'bg-curro-blue text-white border-curro-blue' : 'bg-curro-blue/10 text-curro-blue border-curro-blue/10'}`}>
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isCurrent ? 'bg-curro-blue text-white border-curro-blue' : 'bg-curro-blue/10 text-curro-blue border-curro-blue/10'}`}>
                             Grade {item.grade}
                           </span>
                           {item.type === 'period' ? (
-                            <span className="text-[8px] font-black bg-gray-100 text-text-muted px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                            <span className="text-[10px] font-black bg-gray-100 text-text-muted px-1.5 py-0.5 rounded uppercase tracking-tighter">
                               {item.session}
                             </span>
                           ) : (
-                            <span className="text-[8px] font-black text-white bg-curro-blue px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                            <span className="text-[10px] font-black text-white bg-curro-blue px-2 py-0.5 rounded-full uppercase tracking-tighter">
                               {/* @ts-ignore */}
                               {item.status}
                             </span>
@@ -457,7 +471,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
             </div>
             {nextInvigilatorName && (
               <div className="text-right">
-                <span className="text-[8px] font-black text-curro-blue uppercase tracking-widest block">Next Takeover</span>
+                <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest block">Next Takeover</span>
                 <span className="text-[10px] font-black text-text-dark">{nextInvigilatorName}</span>
               </div>
             )}
@@ -466,7 +480,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
           {/* Progress Bar */}
           <div className="mb-4">
             <div className="flex justify-between items-end mb-1.5">
-              <span className="text-[9px] font-black text-text-muted uppercase tracking-widest">Session Progress</span>
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Session Progress</span>
               <span className={`text-[10px] font-black font-mono ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`}>
                 {Math.round(progressPercent)}%
               </span>
@@ -486,7 +500,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
             <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <MapPin className={`w-3 h-3 ${currentActivity ? 'text-curro-red' : 'text-gray-400'}`} />
-                <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">Current Venue</span>
+                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Current Venue</span>
               </div>
               <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
                 {currentActivity?.venueName || 'None Active'}
@@ -495,7 +509,7 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
             <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <User className={`w-3 h-3 ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`} />
-                <span className="text-[8px] font-black text-text-muted uppercase tracking-tighter">Standby Support</span>
+                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Standby Support</span>
               </div>
               <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
                 {/* @ts-ignore */}
@@ -519,103 +533,64 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
       </div>
 
       {/* Standby Live Notification Popup */}
-      <AnimatePresence>
-        {activeNotification && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-text-dark/90 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="relative w-full max-w-sm bg-white rounded-[32px] overflow-hidden shadow-2xl border-4 border-curro-red animate-pulse-slow"
-            >
-              <div className="p-8 flex flex-col items-center text-center">
-                <div className="w-20 h-20 bg-curro-red/10 text-curro-red rounded-full flex items-center justify-center mb-6 ring-8 ring-curro-red/5">
-                  <AlertCircle className="w-10 h-10" />
-                </div>
-                
-                <h3 className="text-xl font-black text-text-dark uppercase tracking-tight mb-2">HELP REQUESTED!</h3>
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 w-full mb-6 text-left space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Venue</span>
-                    <span className="text-[11px] font-black text-text-dark uppercase">{activeNotification.venueName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Subject</span>
-                    <span className="text-[11px] font-black text-text-dark">{activeNotification.subject} (Gr {activeNotification.grade})</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Teacher</span>
-                    <span className="text-[11px] font-black text-text-dark">{activeNotification.invigilatorName}</span>
-                  </div>
-                  <div className="h-px bg-gray-200 my-2" />
-                  <div className="flex flex-col items-center pt-2">
-                    <span className="text-[9px] font-black text-text-muted uppercase mb-1">Issue Reported:</span>
-                    <span className="text-sm font-black text-curro-red uppercase italic">
-                      {activeNotification.option}
-                      {activeNotification.quantity ? ` (${activeNotification.quantity} required)` : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => handleAcknowledgeNotification(activeNotification)}
-                  className="w-full bg-curro-blue text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
-                >
-                  STATED: I RECEIVED (OK)
-                </button>
-              </div>
-            </motion.div>
+      <Modal
+        open={!!activeNotification}
+        onClose={() => activeNotification && handleAcknowledgeNotification(activeNotification)}
+        title="HELP REQUESTED!"
+        size="sm"
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-curro-red/10 text-curro-red rounded-full flex items-center justify-center mb-6 ring-8 ring-curro-red/5">
+            <AlertCircle className="w-10 h-10" />
           </div>
-        )}
-      </AnimatePresence>
+
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 w-full mb-6 text-left space-y-2">
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Venue</span>
+              <span className="text-xs font-black text-text-dark uppercase">{activeNotification?.venueName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Subject</span>
+              <span className="text-xs font-black text-text-dark">{activeNotification?.subject} (Gr {activeNotification?.grade})</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Teacher</span>
+              <span className="text-xs font-black text-text-dark">{activeNotification?.invigilatorName}</span>
+            </div>
+            <div className="h-px bg-gray-200 my-2" />
+            <div className="flex flex-col items-center pt-2">
+              <span className="text-[10px] font-black text-text-muted uppercase mb-1">Issue Reported:</span>
+              <span className="text-sm font-black text-curro-red uppercase italic">
+                {activeNotification?.option}
+                {activeNotification?.quantity ? ` (${activeNotification.quantity} required)` : ''}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => activeNotification && handleAcknowledgeNotification(activeNotification)}
+            className="w-full bg-curro-blue text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            STATED: I RECEIVED (OK)
+          </button>
+        </div>
+      </Modal>
 
       {/* Call Help Modal */}
-      <AnimatePresence>
-        {isHelpModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center p-0">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsHelpModalOpen(false)}
-              className="absolute inset-0 bg-text-dark/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="relative w-full max-w-lg bg-white rounded-t-[40px] shadow-2xl overflow-hidden pb-10"
-            >
-              <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-4 mb-2" />
-              
-              <div className="px-6 py-6 border-b border-gray-50 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-text-dark uppercase tracking-tight">Need Assistance?</h3>
-                  <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Select an option to alert Standby</p>
-                </div>
-                <button 
-                  onClick={() => setIsHelpModalOpen(false)}
-                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-text-muted"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-3">
-                {(['Question Paper Required', 'Folio required', 'Toiletpaper required', 'Bathroom Break', 'SOS'] as HelpOption[]).map((option) => (
+      <Modal open={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} title="Request help" size="md">
+              <div className="space-y-3">
+                {helpFormError && (
+                  <div role="alert" className="mb-1 rounded-xl border border-curro-red/30 bg-curro-red/5 px-3 py-2 text-xs font-bold text-curro-red">
+                    {helpFormError}
+                  </div>
+                )}
+                {(['Question Paper Required', 'Folio required', 'Toiletpaper required', 'Bathroom Break'] as HelpOption[]).map((option) => (
                   <button
                     key={option}
                     onClick={() => setSelectedHelpOption(option)}
                     className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${
-                      selectedHelpOption === option 
-                        ? 'bg-curro-blue border-curro-blue text-white shadow-lg' 
+                      selectedHelpOption === option
+                        ? 'bg-curro-blue border-curro-blue text-white shadow-lg'
                         : 'bg-gray-50 border-gray-100 text-text-dark hover:border-curro-blue/30'
                     }`}
                   >
@@ -628,13 +603,38 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                   </button>
                 ))}
 
+                <div className="flex items-center gap-3 py-2">
+                  <div className="flex-1 h-px bg-curro-red/20" />
+                  <span className="text-[10px] font-black text-curro-red uppercase tracking-widest">Emergency</span>
+                  <div className="flex-1 h-px bg-curro-red/20" />
+                </div>
+
+                <button
+                  onClick={() => setSelectedHelpOption('SOS')}
+                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center justify-between group ${
+                    selectedHelpOption === 'SOS'
+                      ? 'bg-curro-red border-curro-red text-white shadow-lg shadow-red-500/20'
+                      : 'bg-curro-red/5 border-curro-red/30 text-curro-red hover:bg-curro-red/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="font-black text-sm uppercase tracking-widest">SOS</span>
+                  </div>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
+                    selectedHelpOption === 'SOS' ? 'border-white text-white' : 'border-curro-red/30 text-transparent'
+                  }`}>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </button>
+
                 {selectedHelpOption === 'Question Paper Required' && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     className="pt-4 space-y-3"
                   >
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="qp-quantity" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Number of Papers Required
                     </label>
                     <div className="flex items-center gap-4 bg-blue-50 p-2 rounded-2xl border border-blue-100">
@@ -668,62 +668,31 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Modal>
 
       {/* Footer */}
       <div className="px-5 py-10 text-center opacity-40">
-        <p className="text-[9px] font-black text-text-muted uppercase tracking-[0.3em]">
+        <p className="text-[10px] font-black text-text-muted uppercase tracking-[0.3em]">
           Curro South Africa • Invigilation Systems
         </p>
       </div>
 
       {/* Leave Request Modal */}
-      <AnimatePresence>
-        {isLeaveModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsLeaveModalOpen(false)}
-              className="absolute inset-0 bg-text-dark/40 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-lg bg-white rounded-t-[32px] shadow-2xl overflow-hidden pb-safe"
-            >
-              <div className="px-6 py-6 border-b border-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-curro-red/10 text-curro-red rounded-xl">
-                    <Calendar className="w-5 h-5" />
+      <Modal open={isLeaveModalOpen} onClose={() => setIsLeaveModalOpen(false)} title="Request leave" size="md">
+              <form onSubmit={handleSubmitLeave} className="space-y-6">
+                {leaveFormError && (
+                  <div role="alert" className="rounded-2xl border border-curro-red/30 bg-curro-red/5 px-4 py-3 text-sm font-bold text-curro-red">
+                    {leaveFormError}
                   </div>
-                  <div>
-                    <h3 className="text-sm font-black text-text-dark uppercase tracking-tight">Request Leave</h3>
-                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Submit for approval</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setIsLeaveModalOpen(false)}
-                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-text-muted hover:bg-gray-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmitLeave} className="p-6 space-y-6">
+                )}
                 <div className="space-y-4">
                   {/* Leave Type */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-type" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Type of Leave
                     </label>
                     <select
+                      id="leave-type"
                       value={leaveType}
                       onChange={(e) => setLeaveType(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
@@ -736,13 +705,14 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
                   {/* Date Selection */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Date of Leave
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                      <input 
+                      <input
                         type="date"
+                        id="leave-date"
                         required
                         value={leaveDate}
                         onChange={(e) => setLeaveDate(e.target.value)}
@@ -753,10 +723,11 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
 
                   {/* Reason */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-reason" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Reason / Additional Notes
                     </label>
-                    <textarea 
+                    <textarea
+                      id="leave-reason"
                       required
                       value={leaveReason}
                       onChange={(e) => setLeaveReason(e.target.value)}
@@ -789,31 +760,8 @@ export default function TeacherDashboard({ user, sessions, assignments, entries,
                   )}
                 </button>
               </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      </Modal>
     </div>
-  );
-}
-
-function CheckCircle2(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
   );
 }
 

@@ -140,29 +140,3 @@ export interface HelpRequest {
   status: 'PENDING' | 'COMPLETED';
   createdAt: any; // serverTimestamp
 }
-
-export interface SubjectPriority {
-  pattern: string;
-  priority: number;
-}
-
-export interface RulesConfig {
-  packing: {
-    maxRepacks: number;
-    defaultDaySlotLimit: number;
-    marathonScoreBoost: number;
-    prevDayScoreBoost: number;
-    venueRepeatScoreBoost: number;
-    homeRoomScoreBoost: number;
-    scatteredGapPenalty: number;
-    g12RestrictionThreshold: number;
-    generalRestrictionThreshold: number;
-    subjectPriorities: SubjectPriority[];
-  };
-  equalize: {
-    passes: Array<{ limit: number; respectRestricted: boolean }>;
-    hallPassRequiredForG12: boolean;
-    hallPassRequiredForHall: boolean;
-    techSpecialistOnlyForPrac: boolean;
-  };
-}

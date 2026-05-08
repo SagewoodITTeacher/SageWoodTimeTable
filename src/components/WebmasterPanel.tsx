@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
-import { Teacher, ExamSession, TimetableEntry, DayPeriodConfig } from '../types';
+import React, { Suspense, useMemo } from 'react';
+import { Teacher } from '../types';
 import { motion } from 'motion/react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
-} from 'recharts';
+import { RoleDistributionPieChart, SeriesWorkloadChart } from './charts';
+import { computeWorkload } from '../lib/workload';
+import { useSessions } from '../hooks/useSessions';
+import { useTimetableEntries } from '../hooks/useTimetableEntries';
+import { useDayPeriodConfigs } from '../hooks/useDayPeriodConfigs';
 import { 
   Activity, Server, Database, ShieldAlert, 
   Settings, Globe, Cpu, Network, User, Clock, AlertCircle
@@ -15,104 +16,16 @@ import { parseISO, format } from 'date-fns';
 interface Props {
   user: Teacher;
   teachers: Teacher[];
-  sessions: ExamSession[];
-  entries: TimetableEntry[];
-  dayPeriodConfigs: DayPeriodConfig[];
 }
 
-export default function WebmasterPanel({ user, teachers, sessions, entries, dayPeriodConfigs }: Props) {
-  // Calculate workload statistics
-  const workloadStats = useMemo(() => {
-    const morning = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const afternoon = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const tech = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const standbyCount = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const standbyMinutes = Object.fromEntries(teachers.map(t => [t.id, 0]));
-    const total = Object.fromEntries(teachers.map(t => [t.id, 0]));
-
-    entries.forEach(entry => {
-      if (!entry.invigilatorAssignments) return;
-      
-      const config = dayPeriodConfigs.find(c => c.id === entry.date);
-      const periodsToUse = config?.periods || (format(parseISO(entry.date), "EEEE") === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS);
-
-      Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-        if (!total.hasOwnProperty(tid)) return;
-
-        const parts = key.split("_");
-        const pIdx = parseInt(parts[0]);
-        const vId = parts[1];
-        const role = parts[2];
-
-        // Ensure we only count assignments for venues actually still assigned to this entry
-        if (vId !== "GRADE" && !entry.venueIds?.includes(vId)) return;
-        
-        const p = periodsToUse[pIdx];
-        let duration = entry.durationMinutes || 120;
-        if (p) {
-          const [h1, m1] = p.start.split(":").map(Number);
-          const [h2, m2] = p.end.split(":").map(Number);
-          duration = (h2 * 60 + m2) - (h1 * 60 + m1);
-        }
-
-        if (role === "STANDBY") {
-          standbyMinutes[tid] += duration;
-          total[tid] += duration;
-        } else if (role === "TECH") {
-          tech[tid] += duration;
-          total[tid] += duration;
-        } else if (entry.session === 'MORNING') {
-          morning[tid] += duration;
-          total[tid] += duration;
-        } else if (entry.session === 'AFTERNOON') {
-          afternoon[tid] += duration;
-          total[tid] += duration;
-        }
-      });
-    });
-
-    return teachers
-      .filter(t => {
-        const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-        const isMerike = name.includes("merike") && name.includes("van dyk");
-        const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-        const isITSpec = ["FRAN", "JACB", "NORT", "ORMA"].includes(t.id);
-        const isLSSpec = ["CHAM", "EZNY", "ORIM", "CPMO", "ENYA"].includes(t.id);
-        const isArtSpec = ["SHEH", "SHHU"].includes(t.id);
-        const isSpec = isITSpec || isLSSpec || isArtSpec;
-        
-        // To make it more fair give them 30 % less duty (Rule 5-2)
-        const loadWeight = isSpec ? 0.7 : 1.0;
-
-        return (t.activeRole !== "WEBMASTER" || isFranz || isITSpec || isLSSpec || isArtSpec) && 
-               (t.canInvigilate !== false || isFranz || isITSpec || isLSSpec || isArtSpec) && 
-               !isMerike;
-      })
-      .map(t => {
-          const isITSpec = ["FRAN", "JACB", "NORT", "ORMA"].includes(t.id);
-          const isLSSpec = ["CHAM", "EZNY", "ORIM", "CPMO", "ENYA"].includes(t.id);
-          const isArtSpec = ["SHEH", "SHHU"].includes(t.id);
-          const isSpec = isITSpec || isLSSpec || isArtSpec;
-          const loadWeight = isSpec ? 0.7 : 1.0;
-          return {
-            name: `${t.lastName}, ${t.firstName}`,
-            firstName: t.firstName,
-            lastName: t.lastName,
-            morning: morning[t.id],
-            standby: standbyMinutes[t.id], 
-            afternoon: afternoon[t.id],
-            tech: tech[t.id],
-            total: total[t.id],
-            id: t.id,
-            loadWeight
-          }
-      }).sort((a, b) => {
-      const ln = (a.lastName || "").localeCompare(b.lastName || "");
-      if (ln !== 0) return ln;
-      return (a.firstName || "").localeCompare(b.firstName || "");
-    });
-  }, [entries, teachers, dayPeriodConfigs]);
-
+export default function WebmasterPanel({ user, teachers }: Props) {
+  const { data: sessions } = useSessions();
+  const { data: entries } = useTimetableEntries();
+  const { data: dayPeriodConfigs } = useDayPeriodConfigs();
+  const workloadStats = useMemo(
+    () => computeWorkload(entries, teachers, dayPeriodConfigs),
+    [entries, teachers, dayPeriodConfigs],
+  );
   const roleData = useMemo(() => [
     { name: 'Teachers', value: teachers.length },
     { name: 'Admins', value: teachers.filter(t => t.roles.includes('ADMIN')).length },
@@ -122,17 +35,17 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 
   const stats = [
-    { label: 'Server Load', value: '12%', status: 'Healthy', icon: Cpu },
-    { label: 'API Latency', value: '45ms', status: 'Optimal', icon: Network },
-    { label: 'DB Connections', value: '14 Active', status: 'Stable', icon: Database },
-    { label: 'Error Rate', value: '0.01%', status: 'Low', icon: ShieldAlert },
+    { label: 'Server Load', value: '12%', status: 'Demo', icon: Cpu },
+    { label: 'API Latency', value: '45ms', status: 'Demo', icon: Network },
+    { label: 'DB Connections', value: '14 Active', status: 'Demo', icon: Database },
+    { label: 'Error Rate', value: '0.01%', status: 'Demo', icon: ShieldAlert },
   ];
 
   return (
-    <div className="flex flex-col gap-6 pb-20 text-white font-sans">
+    <div className="-mx-4 md:-mx-8 -mt-4 px-4 md:px-8 pt-6 pb-20 bg-zinc-950 text-white font-sans rounded-3xl flex flex-col gap-6 min-h-[calc(100vh-6rem)]">
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-black tracking-tight text-white uppercase">System Diagnostics</h2>
-        <p className="text-gray-500 font-medium text-sm">Core infrastructure monitoring and global settings.</p>
+        <p className="text-gray-400 font-medium text-sm">Core infrastructure monitoring and global settings.</p>
       </div>
 
       {/* Grid Status Cards */}
@@ -149,7 +62,7 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
               <div className="p-2 bg-white/5 rounded-lg group-hover:bg-orange-500/20 group-hover:text-orange-500 transition-colors">
                 <stat.icon className="w-4 h-4 text-gray-400 group-hover:text-inherit" />
               </div>
-              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                 stat.status === 'Healthy' || stat.status === 'Optimal' || stat.status === 'Stable' 
                   ? 'bg-emerald-500/10 text-emerald-500' 
                   : 'bg-amber-500/10 text-amber-500'
@@ -170,36 +83,22 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
             <Activity className="w-4 h-4 text-orange-500" />
             Role Distribution
           </h3>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={roleData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {roleData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff', fontSize: '12px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="h-[250px] w-full" aria-label="Role distribution chart">
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
+              <RoleDistributionPieChart data={roleData} colors={COLORS} />
+            </Suspense>
           </div>
           <div className="flex justify-center flex-wrap gap-4 mt-2">
-            {roleData.map((d, i) => (
-              <div key={d.name} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                <span className="text-[10px] font-black uppercase text-gray-400">{d.name} ({d.value})</span>
-              </div>
-            ))}
+            {roleData.map((d, i) => {
+              const total = roleData.reduce((s, r) => s + r.value, 0);
+              const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+              return (
+                <div key={d.name} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                  <span className="text-[10px] font-black uppercase text-gray-400">{d.name} ({d.value}) {pct}%</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -246,30 +145,10 @@ export default function WebmasterPanel({ user, teachers, sessions, entries, dayP
             Faculty Assignment Statistics
           </h3>
           
-          <div className="h-[400px] w-full mb-8">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={workloadStats} barCategoryGap="20%">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#6b7280" 
-                  fontSize={8} 
-                  angle={-90}
-                  textAnchor="end"
-                  interval={0}
-                  height={100}
-                />
-                <YAxis stroke="#6b7280" fontSize={10} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff', fontSize: '12px' }}
-                />
-                <Bar dataKey="tech" fill="#0ea5e9" stackId="a" name="Tech" />
-                <Bar dataKey="morning" fill="#3b82f6" stackId="a" name="Morning" />
-                <Bar dataKey="afternoon" fill="#a855f7" stackId="a" name="Afternoon" />
-                <Bar dataKey="standby" fill="#10b981" stackId="a" name="Standby" />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-[400px] w-full mb-8" aria-label="Faculty workload chart">
+            <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
+              <SeriesWorkloadChart data={workloadStats} />
+            </Suspense>
           </div>
 
           <div className="overflow-x-auto">
