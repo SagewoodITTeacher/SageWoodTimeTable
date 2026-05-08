@@ -68,8 +68,7 @@ import { InspectionTab } from "./tabs/InspectionTab";
 // Modal components
 import { TimetableModal } from "./modals/TimetableModal";
 import { SubjectsModal } from "./modals/SubjectsModal";
-import { AddTeacherModal } from "./modals/AddTeacherModal";
-import { EditTeacherModal } from "./modals/EditTeacherModal";
+import { TeacherFormModal } from "./modals/TeacherFormModal";
 import { BreakDutyModal } from "./modals/BreakDutyModal";
 import { HomeRoomModal } from "./modals/HomeRoomModal";
 import { LeaveRequestModal } from "./modals/LeaveRequestModal";
@@ -2008,7 +2007,8 @@ export default function AdminPanel({
             />
           )}
           {isAddModalOpen && (
-            <AddTeacherModal
+            <TeacherFormModal
+              mode="add"
               onClose={() => setIsAddModalOpen(false)}
               onSave={async (teacher) => {
                 setIsSaving(true);
@@ -2028,7 +2028,8 @@ export default function AdminPanel({
             />
           )}
           {selectedTeacherForEdit && (
-            <EditTeacherModal
+            <TeacherFormModal
+              mode="edit"
               teacher={selectedTeacherForEdit}
               onClose={() => setSelectedTeacherForEdit(null)}
               onSave={(updates) =>
