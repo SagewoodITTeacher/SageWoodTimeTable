@@ -1,6 +1,7 @@
-import { Teacher, TimetableEntry } from "../../../types";
-import { getCycleForDate, FAL_SUBJECTS } from "../../../constants";
-import { parseISO } from "date-fns";
+import { Teacher, TimetableEntry, DayPeriodConfig, PeriodConfig, LeaveRequest } from "../../../types";
+import { getCycleForDate, FAL_SUBJECTS, PERIODS, WEDNESDAY_PERIODS } from "../../../constants";
+import { format, parseISO } from "date-fns";
+import { OperationType } from "../../../firebase";
 
 export const getTimetableCell = (
   teacher: any,
@@ -96,17 +97,14 @@ export const getEntryTimes = (entry: TimetableEntry, allEntries: TimetableEntry[
   };
 };
 
-export const isITSpecialistTeacher = (teacher: Teacher) => {
-  return ["FRAN", "JACB", "NORT", "ORMA"].includes(teacher.id);
-};
+export const IT_SPECIALIST_IDS = ["FRAN", "JACB", "NORT", "ORMA"];
+export const LS_SPECIALIST_IDS = ["CHAM", "EZNY", "ORIM", "CPMO", "ENYA"];
+export const ART_SPECIALIST_IDS = ["SHEH", "SHHU"];
+export const ALL_SPECIALIST_IDS = [...IT_SPECIALIST_IDS, ...LS_SPECIALIST_IDS, ...ART_SPECIALIST_IDS];
 
-export const isLSSpecialistTeacher = (teacher: Teacher) => {
-  return ["CHAM", "EZNY", "ORIM", "CPMO", "ENYA"].includes(teacher.id);
-};
-
-export const isArtSpecialistTeacher = (teacher: Teacher) => {
-  return ["SHEH", "SHHU"].includes(teacher.id);
-};
+export const isITSpecialistTeacher = (teacher: Teacher) => IT_SPECIALIST_IDS.includes(teacher.id);
+export const isLSSpecialistTeacher = (teacher: Teacher) => LS_SPECIALIST_IDS.includes(teacher.id);
+export const isArtSpecialistTeacher = (teacher: Teacher) => ART_SPECIALIST_IDS.includes(teacher.id);
 
 export const isTeacherRestricted = (teacher: Teacher, subject: string) => {
   const isFAL = subject === "First Additional Languages";
@@ -188,3 +186,158 @@ export const periodDurationMinutes = (period: { start: string; end: string }) =>
   const [eh, em] = period.end.split(":").map(Number);
   return eh * 60 + em - (sh * 60 + sm);
 };
+
+// --- Period resolution helpers ---
+
+export const getPeriodsForDate = (
+  dateStr: string,
+  dayPeriodConfigs: DayPeriodConfig[],
+): PeriodConfig[] => {
+  const d = parseISO(dateStr);
+  const dayName = format(d, "EEEE");
+  const dateConfig = dayPeriodConfigs.find((c) => c.id === dateStr);
+  const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
+  let basePeriods: PeriodConfig[] = [];
+
+  if (dateConfig) {
+    basePeriods = [...dateConfig.periods];
+  } else if (dayConfig) {
+    basePeriods = [...dayConfig.periods];
+  } else if (dayName === "Wednesday") {
+    basePeriods = [...WEDNESDAY_PERIODS];
+  } else {
+    basePeriods = [...PERIODS];
+  }
+
+  const standardDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+  if (standardDays.includes(dayName)) {
+    const extraSlots = [
+      { id: 10, start: "14:30", end: "15:20", label: "A1" },
+      { id: 11, start: "15:20", end: "16:10", label: "A2" },
+      { id: 12, start: "16:10", end: "17:00", label: "A3" },
+    ];
+    extraSlots.forEach((slot) => {
+      if (!basePeriods.some((p) => p.label === slot.label || p.start === slot.start)) {
+        basePeriods.push(slot);
+      }
+    });
+  }
+
+  return basePeriods.sort((a, b) => a.start.localeCompare(b.start));
+};
+
+export const resolvePeriodsForDate = (
+  dateStr: string,
+  dayPeriodConfigs: DayPeriodConfig[],
+): PeriodConfig[] => {
+  const d = parseISO(dateStr);
+  const dayName = format(d, "EEEE");
+  const dateConfig = dayPeriodConfigs.find((c) => c.id === dateStr);
+  const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
+  if (dateConfig) {return dateConfig.periods;}
+  if (dayConfig) {return dayConfig.periods;}
+  return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
+};
+
+// --- Invigilation eligibility helpers ---
+
+const EXCLUDED_FROM_INVIGILATION_IDS = new Set(["MERV"]);
+
+export const isExcludedFromInvigilation = (teacher: Teacher | undefined | null): boolean => {
+  if (!teacher) {return false;}
+  return EXCLUDED_FROM_INVIGILATION_IDS.has(teacher.id);
+};
+
+const FRANZ_IDS = new Set(["NORT", "FRAN"]);
+
+export const isEligibleForInvigilation = (teacher: Teacher): boolean => {
+  const isSpec = isITSpecialistTeacher(teacher) || isLSSpecialistTeacher(teacher) || isArtSpecialistTeacher(teacher);
+  const isFranz = FRANZ_IDS.has(teacher.id);
+  return !isExcludedFromInvigilation(teacher) && (isSpec || isFranz || (teacher.activeRole !== "WEBMASTER" && teacher.canInvigilate !== false));
+};
+
+// --- SHEH override ---
+
+export const SHEH_OVERRIDE_DATES = new Set(["2026-06-18", "2026-06-19"]);
+
+export const isSHEHOverride = (teacherId: string, dateStr: string): boolean => {
+  return teacherId === "SHEH" && SHEH_OVERRIDE_DATES.has(dateStr);
+};
+
+// --- Leave check ---
+
+export const isTeacherOnLeaveAtPeriod = (
+  teacherId: string,
+  periodIdx: number,
+  dateStr: string,
+  teachers: Teacher[],
+  leaveRequests: LeaveRequest[],
+  dayPeriodConfigs: DayPeriodConfig[],
+): boolean => {
+  const t = teachers.find(t => t.id === teacherId);
+  if (isExcludedFromInvigilation(t)) {return true;}
+
+  const datePeriods = resolvePeriodsForDate(dateStr, dayPeriodConfigs);
+  const period = datePeriods[periodIdx];
+  if (!period) {return false;}
+
+  const request = (leaveRequests || []).find(
+    (lr) =>
+      lr.teacherId === teacherId &&
+      lr.date === dateStr &&
+      (lr.status === "APPROVED" || lr.status === "PENDING"),
+  );
+  if (!request) {return false;}
+
+  if (isSHEHOverride(teacherId, dateStr)) {return false;}
+
+  if (request.isFullDay) {return true;}
+
+  if (request.startTime || request.endTime) {
+    const pStart = period.start;
+    const pEnd = period.end;
+    const lStart = request.startTime || "00:00";
+    const lEnd = request.endTime || "23:59";
+    return pStart < lEnd && lStart < pEnd;
+  }
+
+  return false;
+};
+
+// --- Subject detection helpers ---
+
+export const isITorCATSubject = (subject: string): boolean => {
+  const s = subject.toLowerCase().trim();
+  return s === "it" || s === "cat" || s.startsWith("it ") || s.startsWith("cat ") || s.includes("information technology") || s.includes("computer application technology");
+};
+
+export const isLSSubject = (subject: string): boolean => {
+  const s = subject.toLowerCase().trim();
+  return s === "ls" || s === "life science" || s === "life sciences" || s.includes("life science");
+};
+
+export const isArtSubject = (subject: string): boolean => {
+  const s = subject.toLowerCase().trim();
+  return s === "visual art" || s.includes("visual art");
+};
+
+// --- Firestore helper ---
+
+export async function safeFirestoreWrite<T>(
+  operation: () => Promise<T>,
+  opType: OperationType,
+  path: string,
+  onError: (error: unknown, opType: OperationType, path: string) => void,
+): Promise<T | undefined> {
+  try {
+    return await operation();
+  } catch (error) {
+    onError(error, opType, path);
+    return undefined;
+  }
+}
+
+// --- UI className constants ---
+
+export const INPUT_CLASS = "w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none";
+export const TH_CLASS = "px-5 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest leading-none";
