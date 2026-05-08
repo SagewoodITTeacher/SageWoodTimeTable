@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
-import { SectionCard } from './ui';
+import { SectionCard, Modal } from './ui';
 
 interface Props {
   user: Teacher;
@@ -831,6 +831,7 @@ export default function OperationalManager({ user, teachers }: Props) {
             <input
               type="text"
               placeholder="Search faculty..."
+              aria-label="Search faculty"
               value={adminSearchTerm}
               onChange={(e) => setAdminSearchTerm(e.target.value)}
               className="w-full bg-white/10 border border-white/20 rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold focus:bg-white focus:text-gray-900 transition-all outline-none"
@@ -934,79 +935,64 @@ export default function OperationalManager({ user, teachers }: Props) {
       </SectionCard>
 
       {/* Request Modal */}
-      <AnimatePresence>
-        {isRequestModalOpen && selectedEntry && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl"
-            >
-              <div className="p-6 bg-emerald-600 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Plus className="w-6 h-6" />
-                  <div>
-                    <h3 className="font-black uppercase tracking-tight">Marking Extension</h3>
-                    <p className="text-white/70 text-[9px] font-black uppercase tracking-widest tracking-tighter">{selectedEntry.subject} - Grade {selectedEntry.grade}</p>
-                  </div>
-                </div>
-                <button onClick={() => setIsRequestModalOpen(false)} className="hover:bg-white/20 p-2 rounded-xl transition-all">
-                  <Timer className="w-6 h-6" />
+      <Modal
+        open={isRequestModalOpen && !!selectedEntry}
+        onClose={() => { setIsRequestModalOpen(false); setSelectedEntry(null); }}
+        title="Marking Extension"
+        size="md"
+      >
+        <form onSubmit={handleRequestExtension} className="flex flex-col gap-6">
+          <p className="text-sm text-text-muted font-bold uppercase tracking-widest">
+            {selectedEntry?.subject} — Grade {selectedEntry?.grade}
+          </p>
+          <div>
+            <label htmlFor="ext-days" className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-1">Additional Days (Green)</label>
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setAdditionalDays(n)}
+                  className={`py-3 rounded-2xl font-black text-sm transition-all ${additionalDays === n ? 'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >
+                  +{n}
                 </button>
-              </div>
-
-              <form onSubmit={handleRequestExtension} className="p-8 flex flex-col gap-6">
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-1">Additional Days (Green)</label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {[1, 2, 3, 4, 5].map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setAdditionalDays(n)}
-                        className={`py-3 rounded-2xl font-black text-sm transition-all ${additionalDays === n ? 'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-100' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                      >
-                        +{n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-1">Reason for Request</label>
-                  <textarea 
-                    value={requestReason}
-                    onChange={(e) => setRequestReason(e.target.value)}
-                    required
-                    rows={4}
-                    placeholder="Provide context for the extension requirement..."
-                    className="w-full bg-gray-50 border-2 border-transparent rounded-2xl p-4 text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-500 transition-all outline-none resize-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <button 
-                    type="button"
-                    onClick={() => setIsRequestModalOpen(false)}
-                    className="py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:bg-gray-100 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/30 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Submit Request
-                  </button>
-                </div>
-              </form>
-            </motion.div>
+              ))}
+            </div>
           </div>
-        )}
-      </AnimatePresence>
+
+          <div>
+            <label htmlFor="ext-reason" className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2 block ml-1">Reason for Request</label>
+            <textarea
+              id="ext-reason"
+              value={requestReason}
+              onChange={(e) => setRequestReason(e.target.value)}
+              required
+              rows={4}
+              placeholder="Provide context for the extension requirement..."
+              className="w-full bg-gray-50 border-2 border-transparent rounded-2xl p-4 text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-500 transition-all outline-none resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-4">
+            <button
+              type="button"
+              onClick={() => { setIsRequestModalOpen(false); setSelectedEntry(null); }}
+              className="py-4 rounded-2xl font-black uppercase tracking-widest text-xs text-gray-400 hover:bg-gray-100 transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-500/30 hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4" />}
+              Submit Request
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
@@ -1074,27 +1060,5 @@ const RequestCard: React.FC<RequestCardProps> = ({ ext, onResolve }) => {
         </div>
       )}
     </div>
-  );
-}
-
-function RefreshCw(props: any) {
-  return (
-    <svg 
-      {...props}
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M8 16H3v5" />
-    </svg>
   );
 }
