@@ -216,10 +216,13 @@ export default function Login({ error, onError }: LoginProps) {
 
             <input
               type="email"
+              id="login-email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
+              autoComplete="email"
+              autoFocus
               disabled={emailBusy || passwordBusy}
               className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-medium disabled:opacity-60"
             />
@@ -239,10 +242,12 @@ export default function Login({ error, onError }: LoginProps) {
               <div className="space-y-3">
                 <input
                   type="password"
+                  id="login-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password (min 6 characters)"
+                  autoComplete="current-password"
                   disabled={passwordBusy}
                   className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-medium disabled:opacity-60"
                 />
