@@ -87,7 +87,7 @@ export function SectionCard({
               {title}
             </h2>
             {subtitle && (
-              <p className="text-white/60 text-[11px] font-black uppercase tracking-widest mt-0.5 truncate">
+              <p className="text-white/60 text-xs font-black uppercase tracking-widest mt-0.5 truncate">
                 {subtitle}
               </p>
             )}
