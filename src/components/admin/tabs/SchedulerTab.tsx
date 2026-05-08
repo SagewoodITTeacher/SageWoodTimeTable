@@ -53,6 +53,7 @@ import {
 } from "date-fns";
 import { PeriodConfigModal } from "../modals/PeriodConfigModal";
 import { ConfirmFromState } from "../shared/ConfirmFromState";
+import { TeacherStatusBadges } from "../shared/TeacherStatusBadges";
 import { ConfirmState } from "../shared/types";
 import {
   getAssignmentKey,
@@ -1460,16 +1461,7 @@ export function SchedulerTab({
                                     <span className={`text-[10px] font-black uppercase tracking-widest ${isAssigned ? "text-blue-100" : isSpecialist ? "text-pink-600" : "text-purple-600/60"}`}>
                                       {isAssigned ? "Assigned" : isUsed ? "Occupied" : isSpecialist ? "Technical Specialist" : "Subject Specialist"}
                                     </span>
-                                    {isBlockedByBreak && (
-                                      <span className="text-[7px] font-black bg-amber-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                        Break Duty
-                                      </span>
-                                    )}
-                                    {isBlockedByAfternoon && (
-                                      <span className="text-[7px] font-black bg-blue-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                        Afternoon Duty
-                                      </span>
-                                    )}
+                                    <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} />
                                   </div>
                                 </div>
                               </div>
@@ -1558,21 +1550,7 @@ export function SchedulerTab({
                                         CONFLICT!
                                       </span>
                                     )}
-                                    {isBlockedByBreak && (
-                                      <span className="text-[7px] font-black bg-amber-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                        Break Duty
-                                      </span>
-                                    )}
-                                    {isBlockedByAfternoon && (
-                                      <span className="text-[7px] font-black bg-blue-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                        Afternoon Duty
-                                      </span>
-                                    )}
-                                    {isUsed && !isBlockedByBreak && !isBlockedByAfternoon && (
-                                      <span className="text-[7px] font-black bg-gray-500 text-white px-1 rounded uppercase whitespace-nowrap">
-                                        Occupied
-                                      </span>
-                                    )}
+                                    <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} isUsed={isUsed} />
                                     {t.homeRoomGrade && (
                                       <span className={`text-[7px] font-black px-1 rounded uppercase ${isAssigned || hasConflict ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700"}`}>
                                         HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
@@ -1677,21 +1655,7 @@ export function SchedulerTab({
                                       CONFLICT!
                                     </span>
                                   )}
-                                  {isBlockedByBreak && (
-                                    <span className="text-[7px] font-black bg-amber-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                      Break Duty
-                                    </span>
-                                  )}
-                                  {isBlockedByAfternoon && (
-                                    <span className="text-[7px] font-black bg-blue-600 text-white px-1 rounded uppercase whitespace-nowrap">
-                                      Afternoon Duty
-                                    </span>
-                                  )}
-                                  {isUsed && !isBlockedByBreak && !isBlockedByAfternoon && (
-                                    <span className="text-[7px] font-black bg-gray-500 text-white px-1 rounded uppercase whitespace-nowrap">
-                                      Occupied
-                                    </span>
-                                  )}
+                                  <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} isUsed={isUsed} />
                                   {t.homeRoomGrade && (
                                     <span className={`text-[7px] font-black px-1 rounded uppercase ${isAssigned || hasConflict ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700"}`}>
                                       HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
