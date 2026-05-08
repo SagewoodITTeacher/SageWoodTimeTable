@@ -35,10 +35,10 @@ export default function WebmasterPanel({ user, teachers }: Props) {
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b'];
 
   const stats = [
-    { label: 'Server Load', value: '12%', status: 'Healthy', icon: Cpu },
-    { label: 'API Latency', value: '45ms', status: 'Optimal', icon: Network },
-    { label: 'DB Connections', value: '14 Active', status: 'Stable', icon: Database },
-    { label: 'Error Rate', value: '0.01%', status: 'Low', icon: ShieldAlert },
+    { label: 'Server Load', value: '12%', status: 'Demo', icon: Cpu },
+    { label: 'API Latency', value: '45ms', status: 'Demo', icon: Network },
+    { label: 'DB Connections', value: '14 Active', status: 'Demo', icon: Database },
+    { label: 'Error Rate', value: '0.01%', status: 'Demo', icon: ShieldAlert },
   ];
 
   return (
@@ -83,18 +83,22 @@ export default function WebmasterPanel({ user, teachers }: Props) {
             <Activity className="w-4 h-4 text-orange-500" />
             Role Distribution
           </h3>
-          <div className="h-[250px] w-full">
+          <div className="h-[250px] w-full" aria-label="Role distribution chart">
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
               <RoleDistributionPieChart data={roleData} colors={COLORS} />
             </Suspense>
           </div>
           <div className="flex justify-center flex-wrap gap-4 mt-2">
-            {roleData.map((d, i) => (
-              <div key={d.name} className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
-                <span className="text-[10px] font-black uppercase text-gray-400">{d.name} ({d.value})</span>
-              </div>
-            ))}
+            {roleData.map((d, i) => {
+              const total = roleData.reduce((s, r) => s + r.value, 0);
+              const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
+              return (
+                <div key={d.name} className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} />
+                  <span className="text-[10px] font-black uppercase text-gray-400">{d.name} ({d.value}) {pct}%</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -141,7 +145,7 @@ export default function WebmasterPanel({ user, teachers }: Props) {
             Faculty Assignment Statistics
           </h3>
           
-          <div className="h-[400px] w-full mb-8">
+          <div className="h-[400px] w-full mb-8" aria-label="Faculty workload chart">
             <Suspense fallback={<div className="h-full w-full animate-pulse bg-zinc-800 rounded" />}>
               <SeriesWorkloadChart data={workloadStats} />
             </Suspense>
