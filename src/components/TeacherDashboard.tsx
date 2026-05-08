@@ -597,13 +597,13 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                     {helpFormError}
                   </div>
                 )}
-                {(['Question Paper Required', 'Folio required', 'Toiletpaper required', 'Bathroom Break', 'SOS'] as HelpOption[]).map((option) => (
+                {(['Question Paper Required', 'Folio required', 'Toiletpaper required', 'Bathroom Break'] as HelpOption[]).map((option) => (
                   <button
                     key={option}
                     onClick={() => setSelectedHelpOption(option)}
                     className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${
-                      selectedHelpOption === option 
-                        ? 'bg-curro-blue border-curro-blue text-white shadow-lg' 
+                      selectedHelpOption === option
+                        ? 'bg-curro-blue border-curro-blue text-white shadow-lg'
                         : 'bg-gray-50 border-gray-100 text-text-dark hover:border-curro-blue/30'
                     }`}
                   >
@@ -615,6 +615,31 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                     </div>
                   </button>
                 ))}
+
+                <div className="flex items-center gap-3 py-2">
+                  <div className="flex-1 h-px bg-curro-red/20" />
+                  <span className="text-[10px] font-black text-curro-red uppercase tracking-widest">Emergency</span>
+                  <div className="flex-1 h-px bg-curro-red/20" />
+                </div>
+
+                <button
+                  onClick={() => setSelectedHelpOption('SOS')}
+                  className={`w-full p-5 rounded-2xl border-2 transition-all flex items-center justify-between group ${
+                    selectedHelpOption === 'SOS'
+                      ? 'bg-curro-red border-curro-red text-white shadow-lg shadow-red-500/20'
+                      : 'bg-curro-red/5 border-curro-red/30 text-curro-red hover:bg-curro-red/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5" />
+                    <span className="font-black text-sm uppercase tracking-widest">SOS</span>
+                  </div>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 ${
+                    selectedHelpOption === 'SOS' ? 'border-white text-white' : 'border-curro-red/30 text-transparent'
+                  }`}>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </button>
 
                 {selectedHelpOption === 'Question Paper Required' && (
                   <motion.div 
