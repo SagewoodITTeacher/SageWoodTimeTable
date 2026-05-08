@@ -4568,10 +4568,11 @@ function AddTeacherModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="add-teacher-code" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Staff Code
               </label>
               <input
+                id="add-teacher-code"
                 required
                 type="text"
                 placeholder="e.g. AMOP"
@@ -4583,10 +4584,11 @@ function AddTeacherModal({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="add-teacher-email" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Email (Optional)
               </label>
               <input
+                id="add-teacher-email"
                 type="email"
                 placeholder="teacher@curro.co.za"
                 value={formData.email}
@@ -4603,10 +4605,11 @@ function AddTeacherModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="add-teacher-first" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 First Name
               </label>
               <input
+                id="add-teacher-first"
                 required
                 type="text"
                 placeholder="Amoré"
@@ -4618,10 +4621,11 @@ function AddTeacherModal({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="add-teacher-last" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Last Name
               </label>
               <input
+                id="add-teacher-last"
                 required
                 type="text"
                 placeholder="Pienaar"
@@ -4635,10 +4639,11 @@ function AddTeacherModal({
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+            <label htmlFor="add-teacher-load" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
               Invigilation Load (%)
             </label>
             <input
+              id="add-teacher-load"
               required
               type="number"
               min="0"
@@ -4705,10 +4710,11 @@ function EditTeacherModal({
     <Modal open onClose={onClose} title={`Edit Profile – ${teacher.id}`} size="sm">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+            <label htmlFor="edit-teacher-email" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
               Email Association
             </label>
             <input
+              id="edit-teacher-email"
               type="email"
               placeholder="Assign to Google Account..."
               value={formData.email}
@@ -4728,10 +4734,11 @@ function EditTeacherModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="edit-teacher-first" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 First Name
               </label>
               <input
+                id="edit-teacher-first"
                 required
                 type="text"
                 value={formData.firstName}
@@ -4742,10 +4749,11 @@ function EditTeacherModal({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="edit-teacher-last" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Last Name
               </label>
               <input
+                id="edit-teacher-last"
                 required
                 type="text"
                 value={formData.lastName}
@@ -4758,10 +4766,11 @@ function EditTeacherModal({
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+            <label htmlFor="edit-teacher-load" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
               Invigilation Load (%)
             </label>
             <input
+              id="edit-teacher-load"
               required
               type="number"
               min="0"
