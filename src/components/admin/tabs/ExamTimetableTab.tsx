@@ -224,6 +224,161 @@ export function ExamTimetableTab({
       .join(", ");
   };
 
+  const renderSessionBlock = (
+    grade: number,
+    session: "MORNING" | "AFTERNOON",
+    colors: {
+      headerText: string;
+      headerBg: string;
+      btnBorder: string;
+      btnText: string;
+      btnHover: string;
+    },
+    sessionLabel: string,
+    startTimeNote: string,
+    emptyText: string,
+    addBtnText: string,
+  ) => {
+    const sessionEntries = getEntriesForGradeSession(grade, session);
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h5 className={`text-[10px] font-black ${colors.headerText} uppercase tracking-widest flex items-center gap-2 ${colors.headerBg} px-2 py-1 rounded`}>
+              <Clock className="w-3 h-3" />
+              {sessionLabel}
+            </h5>
+            {(() => {
+              if (sessionEntries.length > 1) {
+                const mode =
+                  sessionEntries[0].sessionMode || "SIMULTANEOUS";
+                return (
+                  <button
+                    onClick={() =>
+                      toggleSessionMode(grade, session, sessionEntries)
+                    }
+                    disabled={isLocked}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
+                      mode === "SIMULTANEOUS"
+                        ? "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                        : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
+                    } disabled:opacity-50 disabled:hover:bg-transparent`}
+                  >
+                    {mode === "SIMULTANEOUS" ? (
+                      <SquareStack className="w-3 h-3" />
+                    ) : (
+                      <ArrowRightCircle className="w-3 h-3" />
+                    )}
+                    {mode}
+                  </button>
+                );
+              }
+              return null;
+            })()}
+          </div>
+          <span className="text-[10px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
+            {startTimeNote}
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          {(() => {
+            const visibleEntries = isLocked
+              ? sessionEntries.filter(
+                  (e) => e.subject && e.subject !== "New Subject",
+                )
+              : sessionEntries;
+
+            if (visibleEntries.length > 0) {
+              return visibleEntries.map((entry) => (
+                <TimetableField
+                  key={entry.id}
+                  entry={entry}
+                  grade={grade}
+                  onSave={(subj, pap, dur, boys, girls, vIds) =>
+                    isLocked
+                      ? Promise.resolve()
+                      : handleSave(
+                          grade,
+                          session,
+                          subj,
+                          pap,
+                          dur,
+                          boys,
+                          girls,
+                          vIds,
+                          entry.id,
+                        )
+                  }
+                  teacherCodes={getTeacherCodes(entry.subject || "")}
+                  paperTypes={paperTypes}
+                  allSubjects={allSubjects}
+                  venues={venues}
+                  isLocked={isLocked}
+                />
+              ));
+            }
+
+            if (isLocked) {return null;}
+
+            return (
+              <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center">
+                <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase italic tracking-widest">
+                  {emptyText}
+                </p>
+              </div>
+            );
+          })()}
+
+          {!isLocked && (
+            <div className="flex gap-2">
+              <button
+                onClick={() =>
+                  handleSave(
+                    grade,
+                    session,
+                    "New Subject",
+                    "Normal",
+                    60,
+                    0,
+                    0,
+                    [],
+                  )
+                }
+                className={`flex-1 py-2 border-2 border-dashed ${colors.btnBorder} rounded-xl text-[10px] font-black ${colors.btnText} uppercase tracking-widest ${colors.btnHover} transition-all flex items-center justify-center gap-2`}
+              >
+                <Plus className="w-3 h-3" />
+                {addBtnText}
+              </button>
+              {sessionEntries.some(
+                (e) => !e.subject || e.subject === "New Subject",
+              ) && (
+                <button
+                  onClick={async () => {
+                    const emptyEntry = sessionEntries.find(
+                      (e) =>
+                        !e.subject || e.subject === "New Subject",
+                    );
+                    if (emptyEntry) {
+                      await deleteDoc(
+                        doc(db, "timetableEntries", emptyEntry.id),
+                      );
+                    }
+                  }}
+                  className="px-4 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+                  title="Remove Empty Session"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Remove Session
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
@@ -336,313 +491,36 @@ export function ExamTimetableTab({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Morning Session */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2 bg-emerald-50 px-2 py-1 rounded">
-                          <Clock className="w-3 h-3" />
-                          Morning Session
-                        </h5>
-                        {(() => {
-                          const morningEntries = getEntriesForGradeSession(
-                            grade,
-                            "MORNING",
-                          );
-                          if (morningEntries.length > 1) {
-                            const mode =
-                              morningEntries[0].sessionMode || "SIMULTANEOUS";
-                            return (
-                              <button
-                                onClick={() =>
-                                  toggleSessionMode(
-                                    grade,
-                                    "MORNING",
-                                    morningEntries,
-                                  )
-                                }
-                                disabled={isLocked}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                  mode === "SIMULTANEOUS"
-                                    ? "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
-                                    : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
-                                } disabled:opacity-50 disabled:hover:bg-transparent`}
-                              >
-                                {mode === "SIMULTANEOUS" ? (
-                                  <SquareStack className="w-3 h-3" />
-                                ) : (
-                                  <ArrowRightCircle className="w-3 h-3" />
-                                )}
-                                {mode}
-                              </button>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                      <span className="text-[10px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
-                        Start: 08:20 (Arrive 07:50 / 07:30 Gr12)
-                      </span>
-                    </div>
-
-                    <div className="space-y-4">
-                      {(() => {
-                        const morningEntries = getEntriesForGradeSession(
-                          grade,
-                          "MORNING",
-                        );
-                        const visibleEntries = isLocked
-                          ? morningEntries.filter(
-                              (e) => e.subject && e.subject !== "New Subject",
-                            )
-                          : morningEntries;
-
-                        if (visibleEntries.length > 0) {
-                          return visibleEntries.map((entry) => (
-                            <TimetableField
-                              key={entry.id}
-                              entry={entry}
-                              grade={grade}
-                              onSave={(subj, pap, dur, boys, girls, vIds) =>
-                                isLocked
-                                  ? Promise.resolve()
-                                  : handleSave(
-                                      grade,
-                                      "MORNING",
-                                      subj,
-                                      pap,
-                                      dur,
-                                      boys,
-                                      girls,
-                                      vIds,
-                                      entry.id,
-                                    )
-                              }
-                              teacherCodes={getTeacherCodes(
-                                entry.subject || "",
-                              )}
-                              paperTypes={paperTypes}
-                              allSubjects={allSubjects}
-                              venues={venues}
-                              isLocked={isLocked}
-                            />
-                          ));
-                        }
-
-                        if (isLocked) {return null;}
-
-                        return (
-                          <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase italic tracking-widest">
-                              No morning exams planned
-                            </p>
-                          </div>
-                        );
-                      })()}
-
-                      {!isLocked && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() =>
-                              handleSave(
-                                grade,
-                                "MORNING",
-                                "New Subject",
-                                "Normal",
-                                60,
-                                0,
-                                0,
-                                [],
-                              )
-                            }
-                            className="flex-1 py-2 border-2 border-dashed border-emerald-100 rounded-xl text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Plus className="w-3 h-3" />
-                            Add Morning Subject
-                          </button>
-                          {getEntriesForGradeSession(grade, "MORNING").some(
-                            (e) => !e.subject || e.subject === "New Subject",
-                          ) && (
-                            <button
-                              onClick={async () => {
-                                const emptyEntry = getEntriesForGradeSession(
-                                  grade,
-                                  "MORNING",
-                                ).find(
-                                  (e) =>
-                                    !e.subject || e.subject === "New Subject",
-                                );
-                                if (emptyEntry) {
-                                  await deleteDoc(
-                                    doc(db, "timetableEntries", emptyEntry.id),
-                                  );
-                                }
-                              }}
-                              className="px-4 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-                              title="Remove Empty Session"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Remove Session
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Afternoon Session */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <h5 className="text-[10px] font-black text-curro-red uppercase tracking-widest flex items-center gap-2 bg-red-50 px-2 py-1 rounded">
-                          <Clock className="w-3 h-3" />
-                          Afternoon Session
-                        </h5>
-                        {(() => {
-                          const afternoonEntries = getEntriesForGradeSession(
-                            grade,
-                            "AFTERNOON",
-                          );
-                          if (afternoonEntries.length > 1) {
-                            const mode =
-                              afternoonEntries[0].sessionMode || "SIMULTANEOUS";
-                            return (
-                              <button
-                                onClick={() =>
-                                  toggleSessionMode(
-                                    grade,
-                                    "AFTERNOON",
-                                    afternoonEntries,
-                                  )
-                                }
-                                disabled={isLocked}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
-                                  mode === "SIMULTANEOUS"
-                                    ? "bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
-                                    : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
-                                } disabled:opacity-50 disabled:hover:bg-transparent`}
-                              >
-                                {mode === "SIMULTANEOUS" ? (
-                                  <SquareStack className="w-3 h-3" />
-                                ) : (
-                                  <ArrowRightCircle className="w-3 h-3" />
-                                )}
-                                {mode}
-                              </button>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                      <span className="text-[10px] font-bold text-text-muted bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase">
-                        Start: 13:20 (Arrive 12:50 / 12:30 Gr12)
-                      </span>
-                    </div>
-
-                    <div className="space-y-4">
-                      {(() => {
-                        const afternoonEntries = getEntriesForGradeSession(
-                          grade,
-                          "AFTERNOON",
-                        );
-                        const visibleEntries = isLocked
-                          ? afternoonEntries.filter(
-                              (e) => e.subject && e.subject !== "New Subject",
-                            )
-                          : afternoonEntries;
-
-                        if (visibleEntries.length > 0) {
-                          return visibleEntries.map((entry) => (
-                            <TimetableField
-                              key={entry.id}
-                              entry={entry}
-                              grade={grade}
-                              onSave={(subj, pap, dur, boys, girls, vIds) =>
-                                isLocked
-                                  ? Promise.resolve()
-                                  : handleSave(
-                                      grade,
-                                      "AFTERNOON",
-                                      subj,
-                                      pap,
-                                      dur,
-                                      boys,
-                                      girls,
-                                      vIds,
-                                      entry.id,
-                                    )
-                              }
-                              teacherCodes={getTeacherCodes(
-                                entry.subject || "",
-                              )}
-                              paperTypes={paperTypes}
-                              allSubjects={allSubjects}
-                              venues={venues}
-                              isLocked={isLocked}
-                            />
-                          ));
-                        }
-
-                        if (isLocked) {return null;}
-
-                        return (
-                          <div className="p-4 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center justify-center text-center">
-                            <p className="text-[10px] font-bold text-text-muted opacity-40 uppercase italic tracking-widest">
-                              No afternoon exams planned
-                            </p>
-                          </div>
-                        );
-                      })()}
-
-                      {!isLocked && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() =>
-                              handleSave(
-                                grade,
-                                "AFTERNOON",
-                                "New Subject",
-                                "Normal",
-                                60,
-                                0,
-                                0,
-                                [],
-                              )
-                            }
-                            className="flex-1 py-2 border-2 border-dashed border-red-100 rounded-xl text-[10px] font-black text-curro-red uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Plus className="w-3 h-3" />
-                            Add Afternoon Subject
-                          </button>
-                          {getEntriesForGradeSession(grade, "AFTERNOON").some(
-                            (e) => !e.subject || e.subject === "New Subject",
-                          ) && (
-                            <button
-                              onClick={async () => {
-                                const emptyEntry = getEntriesForGradeSession(
-                                  grade,
-                                  "AFTERNOON",
-                                ).find(
-                                  (e) =>
-                                    !e.subject || e.subject === "New Subject",
-                                );
-                                if (emptyEntry) {
-                                  await deleteDoc(
-                                    doc(db, "timetableEntries", emptyEntry.id),
-                                  );
-                                }
-                              }}
-                              className="px-4 py-2 border-2 border-dashed border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-                              title="Remove Empty Session"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              Remove Session
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  {renderSessionBlock(
+                    grade,
+                    "MORNING",
+                    {
+                      headerText: "text-emerald-600",
+                      headerBg: "bg-emerald-50",
+                      btnBorder: "border-emerald-100",
+                      btnText: "text-emerald-600",
+                      btnHover: "hover:bg-emerald-50",
+                    },
+                    "Morning Session",
+                    "Start: 08:20 (Arrive 07:50 / 07:30 Gr12)",
+                    "No morning exams planned",
+                    "Add Morning Subject",
+                  )}
+                  {renderSessionBlock(
+                    grade,
+                    "AFTERNOON",
+                    {
+                      headerText: "text-curro-red",
+                      headerBg: "bg-red-50",
+                      btnBorder: "border-red-100",
+                      btnText: "text-curro-red",
+                      btnHover: "hover:bg-red-50",
+                    },
+                    "Afternoon Session",
+                    "Start: 13:20 (Arrive 12:50 / 12:30 Gr12)",
+                    "No afternoon exams planned",
+                    "Add Afternoon Subject",
+                  )}
                 </div>
               </div>
             ))}
