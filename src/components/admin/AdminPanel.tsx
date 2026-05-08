@@ -85,6 +85,15 @@ import {
   isLSSpecialistTeacher,
   isArtSpecialistTeacher,
   isTechnicalStaffEligible,
+  getPeriodsForDate as _getPeriodsForDate,
+  resolvePeriodsForDate as _resolvePeriodsForDate,
+  periodDurationMinutes,
+  isLSSubject,
+  isExcludedFromInvigilation,
+  isEligibleForInvigilation,
+  isSHEHOverride,
+  SHEH_OVERRIDE_DATES,
+  isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
 } from "./shared/helpers";
 
 interface Props {
@@ -120,50 +129,8 @@ export default function AdminPanel({
     return Array.from(new Set(teachers.flatMap((t) => (t.subjects || []).map(s => typeof s === 'string' ? s : s.name)))).sort();
   }, [teachers]);
 
-  const getPeriodsForDate = (dateStr: string) => {
-    const d = parseISO(dateStr);
-    const dayName = format(d, "EEEE");
-    const dateConfig = dayPeriodConfigs.find((c) => c.id === dateStr);
-    const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-    let basePeriods: PeriodConfig[] = [];
-
-    if (dateConfig) {
-      basePeriods = [...dateConfig.periods];
-    } else if (dayConfig) {
-      basePeriods = [...dayConfig.periods];
-    } else if (dayName === "Wednesday") {
-      basePeriods = [...WEDNESDAY_PERIODS];
-    } else {
-      basePeriods = [...PERIODS];
-    }
-
-    const standardDays = [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-    ];
-    if (standardDays.includes(dayName)) {
-      const extraSlots = [
-        { id: 10, start: "14:30", end: "15:20", label: "A1" },
-        { id: 11, start: "15:20", end: "16:10", label: "A2" },
-        { id: 12, start: "16:10", end: "17:00", label: "A3" },
-      ];
-
-      extraSlots.forEach((slot) => {
-        if (
-          !basePeriods.some(
-            (p) => p.label === slot.label || p.start === slot.start,
-          )
-        ) {
-          basePeriods.push(slot);
-        }
-      });
-    }
-
-    return basePeriods.sort((a, b) => a.start.localeCompare(b.start));
-  };
+  const getPeriodsForDate = (dateStr: string) => _getPeriodsForDate(dateStr, dayPeriodConfigs);
+  const resolvePeriodsForDate = (dateStr: string) => _resolvePeriodsForDate(dateStr, dayPeriodConfigs);
   const [showStats, setShowStats] = useState(false);
   const [enableCheckMode, setEnableCheckMode] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -359,50 +326,7 @@ export default function AdminPanel({
     teacherId: string,
     periodIdx: number,
     dateStr: string,
-  ) => {
-    const t = teachers.find(t => t.id === teacherId);
-    if (t) {
-      const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      if (name.includes("merike") && name.includes("van dyk")) {return true;}
-    }
-
-    const datePeriods = (() => {
-        const dateConfig = dayPeriodConfigs.find((c) => c.id === dateStr);
-        const d = parseISO(dateStr);
-        const dayName = format(d, "EEEE");
-        const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-        if (dateConfig && dateConfig.periods) {return dateConfig.periods;}
-        if (dayConfig && dayConfig.periods) {return dayConfig.periods;}
-        return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
-    })();
-
-    const period = datePeriods[periodIdx];
-    if (!period) {return false;}
-
-    const request = (leaveRequests || []).find(
-      (lr) =>
-        lr.teacherId === teacherId &&
-        lr.date === dateStr &&
-        (lr.status === "APPROVED" || lr.status === "PENDING"),
-    );
-    if (!request) {return false;}
-
-    if (teacherId === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
-      return false;
-    }
-
-    if (request.isFullDay) {return true;}
-
-    if (request.startTime || request.endTime) {
-      const pStart = period.start;
-      const pEnd = period.end;
-      const lStart = request.startTime || "00:00";
-      const lEnd = request.endTime || "23:59";
-      return pStart < lEnd && lStart < pEnd;
-    }
-
-    return false;
-  };
+  ) => _isTeacherOnLeaveAtPeriod(teacherId, periodIdx, dateStr, teachers, leaveRequests, dayPeriodConfigs);
 
   const hasIncompleteVenues = useMemo(() => {
     return entries.some(e => !e.venueIds || e.venueIds.length === 0);
@@ -474,18 +398,9 @@ export default function AdminPanel({
         return;
       }
       const daysInRange = eachDayOfInterval({ start: startDate, end: endDate });
-      const localTeachers = teachers.filter((t) => {
-        const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-        const isMerike = name.includes("merike") && name.includes("van dyk");
-        const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
-        const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-        return (
-          t.invigilationPreference !== "OPS" &&
-          (t.activeRole !== "WEBMASTER" || isSpec || isFranz) &&
-          (t.canInvigilate !== false || isSpec || isFranz) &&
-          !isMerike
-        );
-      });
+      const localTeachers = teachers.filter((t) =>
+        t.invigilationPreference !== "OPS" && isEligibleForInvigilation(t)
+      );
 
       const uniqueEntryDates = new Set(entries.filter(e => {
         const d = parseISO(e.date);
@@ -505,9 +420,7 @@ export default function AdminPanel({
         relevantPIdxs.forEach(pIdx => {
           const p = datePeriods[pIdx];
           if (!p) {return;}
-          const [h1, m1] = p.start.split(":").map(Number);
-          const [h2, m2] = p.end.split(":").map(Number);
-          const dur = (h2 * 60 + m2 - (h1 * 60 + m1));
+          const dur = periodDurationMinutes(p);
 
           totalReqMinutes += dur;
           assignedVenuesList.forEach(venue => {
@@ -541,9 +454,7 @@ export default function AdminPanel({
             const pIdx = parseInt(key.split("_")[0]);
             const period = datePeriods[pIdx];
             if (period) {
-              const [h1, m1] = period.start.split(":").map(Number);
-              const [h2, m2] = period.end.split(":").map(Number);
-              const pDuration = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+              const pDuration = periodDurationMinutes(period) / 60;
               teacherHours[tid] += pDuration;
             }
           }
@@ -597,7 +508,7 @@ export default function AdminPanel({
             .map(e => e.subject)));
 
           dayEntries.forEach(e => {
-            if ((e.date === "2026-06-18" || e.date === "2026-06-19") && e.subject.toLowerCase().includes("visual art")) {
+            if (SHEH_OVERRIDE_DATES.has(e.date) && e.subject.toLowerCase().includes("visual art")) {
               const pIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
               if (!e.invigilatorAssignments) {e.invigilatorAssignments = {};}
               pIdxs.forEach(p => {
@@ -737,7 +648,7 @@ export default function AdminPanel({
                       }
                     }
 
-                    if (t.id === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
+                    if (isSHEHOverride(t.id, dateStr)) {
                       return false;
                     }
 
@@ -769,9 +680,7 @@ export default function AdminPanel({
                   const datePeriods = getPeriodsForDate(dateStr);
                   const period = datePeriods[pIdx];
                   if (period) {
-                    const [h1, m1] = period.start.split(":").map(Number);
-                    const [h2, m2] = period.end.split(":").map(Number);
-                    const pDuration = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+                    const pDuration = periodDurationMinutes(period) / 60;
                     teacherHoursInRange[chosen.id] = (teacherHoursInRange[chosen.id] || 0) + pDuration;
                   }
                 } else {
@@ -797,7 +706,7 @@ export default function AdminPanel({
 
                     if (t.hasReward && rewardDays[t.id] === dateStr) {return false;}
 
-                    if (t.id === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
+                    if (isSHEHOverride(t.id, dateStr)) {
                       return false;
                     }
 
@@ -823,9 +732,7 @@ export default function AdminPanel({
                   const datePeriods = getPeriodsForDate(dateStr);
                   const period = datePeriods[pIdx];
                   if (period) {
-                    const [h1, m1] = period.start.split(":").map(Number);
-                    const [h2, m2] = period.end.split(":").map(Number);
-                    const pDuration = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
+                    const pDuration = periodDurationMinutes(period) / 60;
                     teacherHoursInRange[chosen.id] = (teacherHoursInRange[chosen.id] || 0) + pDuration;
                   }
                 }
@@ -915,18 +822,9 @@ export default function AdminPanel({
       const endDate = parseISO(autoUntilDate);
       const daysInRange = eachDayOfInterval({ start: startDate, end: endDate });
 
-      const localTeachers = teachers.filter((t) => {
-        const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-        const isMerike = name.includes("merike") && name.includes("van dyk");
-        const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
-        const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-        return (
-          t.invigilationPreference !== "OPS" &&
-          (t.activeRole !== "WEBMASTER" || isSpec || isFranz) &&
-          (t.canInvigilate !== false || isSpec || isFranz) &&
-          !isMerike
-        );
-      });
+      const localTeachers = teachers.filter((t) =>
+        t.invigilationPreference !== "OPS" && isEligibleForInvigilation(t)
+      );
 
       const studentCountsPerDay: Record<string, number> = {};
       entries.forEach(e => {
@@ -1029,7 +927,7 @@ export default function AdminPanel({
           }
         }
 
-        if (t.id === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
+        if (isSHEHOverride(t.id, dateStr)) {
             const isArtTech = entry.subject.toLowerCase().includes("visual art") && (role === "TECH" || role === "TECHNICAL");
             if (!isArtTech) {return false;}
         }
@@ -1051,8 +949,7 @@ export default function AdminPanel({
         if (techTidsToday.has(t.id) && !(role === "TECH" || role === "TECHNICAL")) {return false;}
         if ((role === "TECH" || role === "TECHNICAL") && !isTechnicalStaffEligible(t, entry.subject)) {return false;}
 
-        const s = entry.subject.toLowerCase();
-        const isLS = s.includes("life science");
+        const isLS = isLSSubject(entry.subject);
         const isPrac = entry.paperType === "Prac";
         if (isLS && isPrac && (role === "TECH" || role === "TECHNICAL")) {
           if (!isLSSpecialistTeacher(t)) {return false;}
@@ -1428,15 +1325,10 @@ export default function AdminPanel({
     const teacherPotentials: { [teacherId: string]: number } = {};
 
     teachers.forEach((t) => {
-      const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      const isMerike = name.includes("merike") && name.includes("van dyk");
-      const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
-
-      const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-
-      if ((t.activeRole === "WEBMASTER" && !isSpec && !isFranz) || (t.canInvigilate === false && !isSpec && !isFranz) || isMerike)
+      if (!isEligibleForInvigilation(t))
         {return;}
 
+      const isSpec = isITSpecialistTeacher(t) || isLSSpecialistTeacher(t) || isArtSpecialistTeacher(t);
       assignedMinutes[t.id] = 0;
       teacherBreakdown[t.id] = { morning: 0, afternoon: 0, tech: 0, standby: 0 };
       teacherPotentials[t.id] = (t.workloadPercentage ?? 100) * (isSpec ? 0.7 : 1);
@@ -1448,15 +1340,7 @@ export default function AdminPanel({
     );
 
     entries.forEach((entry) => {
-      const datePeriods = (() => {
-        const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-        if (dateConfig) {return dateConfig.periods;}
-        const d = parseISO(entry.date);
-        const dayName = format(d, "EEEE");
-        const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-        if (dayConfig) {return dayConfig.periods;}
-        return dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS;
-      })();
+      const datePeriods = resolvePeriodsForDate(entry.date);
 
       const periodEndOffsets = datePeriods.map((p) => {
         const [h, m] = p.end.split(":").map(Number);
@@ -1486,9 +1370,7 @@ export default function AdminPanel({
 
       relevantPIdxs.forEach((pIdx) => {
         const period = datePeriods[pIdx];
-        const [h1, m1] = period.start.split(":").map(Number);
-        const [h2, m2] = period.end.split(":").map(Number);
-        const pDuration = h2 * 60 + m2 - (h1 * 60 + m1);
+        const pDuration = periodDurationMinutes(period);
 
         assignedVenueObjs.forEach((venue) => {
           if (!venue) {return;}
@@ -1582,17 +1464,7 @@ export default function AdminPanel({
           const teacher = teachers.find((t) => t.id === teacherId);
           const venue = venues.find((v) => v.id === vId);
 
-          const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-          const d = parseISO(entry.date);
-          const dayName = format(d, "EEEE");
-          const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-          const datePeriods = dateConfig
-            ? dateConfig.periods
-            : dayConfig
-              ? dayConfig.periods
-              : dayName === "Wednesday"
-                ? WEDNESDAY_PERIODS
-                : PERIODS;
+          const datePeriods = resolvePeriodsForDate(entry.date);
           const period = datePeriods[pIdx];
 
           const { start: startStr, end: endTimeStr } = getEntryTimes(entry, entries);

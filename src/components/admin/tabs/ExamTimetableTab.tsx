@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { parseISO } from "date-fns";
 import { TimetableField } from "../shared/TimetableField";
+import { isExcludedFromInvigilation } from "../shared/helpers";
 
 export function ExamTimetableTab({
   date,
@@ -99,11 +100,7 @@ export function ExamTimetableTab({
   const invigilatorCount = teachers.filter(
     (t) =>
       t.canInvigilate !== false &&
-      !(
-        (t.firstName === "Merike" || t.firstName === "Merike van Dyk") &&
-        (t.lastName === "Van Dyk" || t.lastName === "van Dyk" || !t.lastName)
-      ) &&
-      t.id !== "MERV", // Explicitly exclude Merike ID just in case
+      !isExcludedFromInvigilation(t),
   ).length;
 
   const invigilationRatio =

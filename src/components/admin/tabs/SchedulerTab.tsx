@@ -62,6 +62,13 @@ import {
   isArtSpecialistTeacher,
   isTeacherRestricted,
   isTechnicalStaffEligible,
+  isITorCATSubject,
+  isLSSubject,
+  isArtSubject,
+  isExcludedFromInvigilation,
+  isEligibleForInvigilation,
+  isSHEHOverride,
+  isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
 } from "../shared/helpers";
 
 export function SchedulerTab({
@@ -369,10 +376,7 @@ export function SchedulerTab({
       const teacherId = newAssignments[assignmentKey];
       const teacher = teachers.find(t => t.id === teacherId);
 
-      const isITorCAT = entry.subject.toLowerCase().includes("it") ||
-                        entry.subject.toLowerCase().includes("information technology") ||
-                        entry.subject.toLowerCase().includes("cat") ||
-                        entry.subject.toLowerCase().includes("computer application technology");
+      const isITorCAT = isITorCATSubject(entry.subject);
 
       const isPrac = entry.paperType === "Prac";
       const isSpecialist = teacher && isITSpecialistTeacher(teacher);
@@ -483,42 +487,7 @@ export function SchedulerTab({
     teacherId: string,
     periodIdx: number,
     dateStr: string,
-  ) => {
-    const t = teachers.find(t => t.id === teacherId);
-    if (t) {
-      const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      if (name.includes("merike") && name.includes("van dyk")) {return true;}
-    }
-
-    const datePeriods = getPeriodsForDate(dateStr);
-    const period = datePeriods[periodIdx];
-    if (!period) {return false;}
-
-    const request = (leaveRequests || []).find(
-      (lr) =>
-        lr.teacherId === teacherId &&
-        lr.date === dateStr &&
-        (lr.status === "APPROVED" || lr.status === "PENDING"),
-    );
-    if (!request) {return false;}
-
-    // Special Override: Shelton Hu is available on 18-19 June for Visual Art Tech support
-    if (teacherId === "SHEH" && (dateStr === "2026-06-18" || dateStr === "2026-06-19")) {
-      return false;
-    }
-
-    if (request.isFullDay) {return true;}
-
-    if (request.startTime || request.endTime) {
-      const pStart = period.start;
-      const pEnd = period.end;
-      const lStart = request.startTime || "00:00";
-      const lEnd = request.endTime || "23:59";
-      return pStart < lEnd && lStart < pEnd;
-    }
-
-    return false;
-  };
+  ) => _isTeacherOnLeaveAtPeriod(teacherId, periodIdx, dateStr, teachers, leaveRequests, dayPeriodConfigs);
 
 
   return (
@@ -792,22 +761,7 @@ export function SchedulerTab({
             );
 
             const teachersWithStatus = teachers
-              .filter((t) => {
-                const name = `${t.firstName} ${t.lastName} ${t.id}`.toLowerCase();
-                const isITSpec = isITSpecialistTeacher(t);
-                const isLSSpec = isLSSpecialistTeacher(t);
-                const isArtSpec = isArtSpecialistTeacher(t);
-                const isSpec = isITSpec || isLSSpec || isArtSpec;
-                const isFranz = t.id === "NORT" || t.id === "FRAN" || name.includes("franz") || name.includes("nortje");
-                const isMerike =
-                  t.firstName.toLowerCase().includes("merike") &&
-                  t.lastName.toLowerCase().includes("van dyk");
-                return (
-                  (t.activeRole !== "WEBMASTER" || isSpec || isFranz) &&
-                  (t.canInvigilate !== false || isSpec || isFranz) &&
-                  !isMerike
-                );
-              })
+              .filter((t) => isEligibleForInvigilation(t))
               .map((t) => {
                 // Determine if teacher teaches ANY grade that is writing today
                 const primaryFor = relevantPIdxs.filter((pIdx) =>
@@ -826,10 +780,9 @@ export function SchedulerTab({
                   entry.subject,
                 );
 
-                const s = entry.subject.toLowerCase().trim();
-                const isITorCATEntry = s === "it" || s === "cat" || s.startsWith("it ") || s.startsWith("cat ") || s.includes("information technology") || s.includes("computer application technology");
-                const isLSEntry = s === "ls" || s === "life science" || s === "life sciences" || s.includes("life science");
-                const isArtEntry = s === "visual art" || s.includes("visual art");
+                const isITorCATEntry = isITorCATSubject(entry.subject);
+                const isLSEntry = isLSSubject(entry.subject);
+                const isArtEntry = isArtSubject(entry.subject);
 
                 const tName = `${t.firstName} ${t.lastName} ${t.id}`.toLowerCase();
                 const isITSpecialist = isITSpecialistTeacher(t);
@@ -888,8 +841,7 @@ export function SchedulerTab({
 
             // Filter out Merike van Dyk entirely
             const eligibleTeachersWithStatus = teachersWithStatus.filter(ts => {
-              const name = `${ts.teacher.firstName} ${ts.teacher.lastName}`.toLowerCase();
-              return !name.includes("merike van dyk");
+              return !isExcludedFromInvigilation(ts.teacher);
             });
 
             const filteredTeachersWithStatus = eligibleTeachersWithStatus.filter(ts => {
@@ -1302,13 +1254,11 @@ export function SchedulerTab({
 
                                         const isAssigned = !!assignedId;
 
-                                        const s = entry.subject.toLowerCase().trim();
-                                        const isITorCAT = s === "it" || s === "cat" || s.startsWith("it ") || s.startsWith("cat ") || s.includes("information technology") || s.includes("computer application technology");
-                                        const isLS = s === "ls" || s === "life science" || s === "life sciences" || s.includes("life science");
+                                        const isITorCAT = isITorCATSubject(entry.subject);
+                                        const isLS = isLSSubject(entry.subject);
 
-                                        const name = teacher ? `${teacher.firstName} ${teacher.lastName} ${teacher.id}`.toLowerCase() : "";
-                                        const isITSpecialist = isITSpecialistTeacher(teacher || {} as any);
-                                        const isLSSpecialist = name.includes("chare mouton") || name.includes("ezra nyathi") || name.includes("oritonda pinkie mafhungo") || (name.includes("oritonda") && name.includes("mafhungo"));
+                                        const isITSpecialist = teacher ? isITSpecialistTeacher(teacher) : false;
+                                        const isLSSpecialist = teacher ? isLSSpecialistTeacher(teacher) : false;
 
                                         const isSpecialistForThisEntry = teacher && ((isITorCAT && isITSpecialist) || (isLS && isLSSpecialist));
 

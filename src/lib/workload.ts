@@ -1,6 +1,5 @@
 import { Teacher, TimetableEntry, DayPeriodConfig } from '../types';
-import { format, parseISO } from 'date-fns';
-import { PERIODS, WEDNESDAY_PERIODS } from '../constants';
+import { resolvePeriodsForDate, periodDurationMinutes, isExcludedFromInvigilation } from '../components/admin/shared/helpers';
 
 export interface WorkloadRow {
   name: string;
@@ -43,8 +42,7 @@ export function computeWorkload(
   entries.forEach(entry => {
     if (!entry.invigilatorAssignments) { return; }
 
-    const dc = dayPeriodConfigs.find(c => c.id === entry.date);
-    const periodsToUse = dc?.periods || (format(parseISO(entry.date), 'EEEE') === 'Wednesday' ? WEDNESDAY_PERIODS : PERIODS);
+    const periodsToUse = resolvePeriodsForDate(entry.date, dayPeriodConfigs);
 
     Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
       if (!total.hasOwnProperty(tid)) { return; }
@@ -59,9 +57,7 @@ export function computeWorkload(
       const p = periodsToUse[pIdx];
       let duration = entry.durationMinutes || 120;
       if (p) {
-        const [h1, m1] = p.start.split(':').map(Number);
-        const [h2, m2] = p.end.split(':').map(Number);
-        duration = (h2 * 60 + m2) - (h1 * 60 + m1);
+        duration = periodDurationMinutes(p);
       }
 
       if (role === 'STANDBY') {
@@ -82,12 +78,10 @@ export function computeWorkload(
 
   return teachers
     .filter(t => {
-      const name = `${t.firstName} ${t.lastName}`.toLowerCase();
-      const isExcluded = config.excludedNames.some(ex => name.includes(ex.toLowerCase()));
       const isSpecialist = config.specialistIds.includes(t.id);
       return (t.activeRole !== 'WEBMASTER' || isSpecialist) &&
              (t.canInvigilate !== false || isSpecialist) &&
-             !isExcluded;
+             !isExcludedFromInvigilation(t);
     })
     .map(t => {
       const isSpecialist = config.specialistIds.includes(t.id);

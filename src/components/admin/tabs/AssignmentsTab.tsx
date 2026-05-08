@@ -1,6 +1,5 @@
 import React from "react";
 import { Teacher, TimetableEntry, Venue, DayPeriodConfig, LeaveRequest } from "../../../types";
-import { PERIODS, WEDNESDAY_PERIODS } from "../../../constants";
 import { db, handleFirestoreError, OperationType } from "../../../firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { format, parseISO } from "date-fns";
@@ -16,7 +15,7 @@ import {
   ArrowUpRight,
   Zap,
 } from "lucide-react";
-import { getEntryTimes, getTimetableCell } from "../shared/helpers";
+import { getEntryTimes, getTimetableCell, resolvePeriodsForDate } from "../shared/helpers";
 
 export interface AssignmentsTabProps {
   // Data
@@ -430,11 +429,7 @@ export function AssignmentsTab({
                       const teacher = teachers.find(t => t.id === teacherId);
                       const venue = venues.find(v => v.id === vId);
 
-                      const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-                      const d = parseISO(entry.date);
-                      const dayName = format(d, "EEEE");
-                      const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-                      const datePeriods = dateConfig ? dateConfig.periods : (dayConfig ? dayConfig.periods : (dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS));
+                      const datePeriods = resolvePeriodsForDate(entry.date, dayPeriodConfigs);
                       const period = datePeriods[pIdx];
 
                       const { start: startStr, end: endTimeStr } = getEntryTimes(entry, entries);

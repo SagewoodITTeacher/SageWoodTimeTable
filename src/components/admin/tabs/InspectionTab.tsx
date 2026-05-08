@@ -13,12 +13,12 @@ import {
   Users,
 } from "lucide-react";
 import { Teacher, TimetableEntry, Venue, DayPeriodConfig } from "../../../types";
-import { PERIODS, WEDNESDAY_PERIODS } from "../../../constants";
 import { db, handleFirestoreError, OperationType } from "../../../firebase";
 import { doc, updateDoc, writeBatch } from "firebase/firestore";
 import { InspectionCalendar } from "../shared/InspectionCalendar";
 import { ConfirmFromState } from "../shared/ConfirmFromState";
 import { ConfirmState } from "../shared/types";
+import { resolvePeriodsForDate, periodDurationMinutes } from "../shared/helpers";
 
 export interface InspectionTabProps {
   // Data
@@ -81,11 +81,7 @@ export function InspectionTab({
                 // Pre-calculate assignments for duplicate check in header
                 const teacherAssignments = entries.flatMap((entry) => {
                   if (!entry.invigilatorAssignments) {return [];}
-                  const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-                  const d = parseISO(entry.date);
-                  const dayName = format(d, "EEEE");
-                  const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-                  const datePeriods = dateConfig ? dateConfig.periods : (dayConfig ? dayConfig.periods : (dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS));
+                  const datePeriods = resolvePeriodsForDate(entry.date, dayPeriodConfigs);
 
                   return Object.entries(entry.invigilatorAssignments)
                     .filter(([_, tId]) => tId === selectedInspectionTeacherId)
@@ -268,11 +264,7 @@ export function InspectionTab({
                   const teacherAssignments = entries.flatMap((entry) => {
                     if (!entry.invigilatorAssignments) {return [];}
 
-                    const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-                    const d = parseISO(entry.date);
-                    const dayName = format(d, "EEEE");
-                    const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-                    const datePeriods = dateConfig ? dateConfig.periods : (dayConfig ? dayConfig.periods : (dayName === "Wednesday" ? WEDNESDAY_PERIODS : PERIODS));
+                    const datePeriods = resolvePeriodsForDate(entry.date, dayPeriodConfigs);
 
                     return Object.entries(entry.invigilatorAssignments)
                       .filter(([key, tId]) => {
@@ -289,9 +281,7 @@ export function InspectionTab({
                         if (!period) {return null;}
 
                         const venue = venues.find(v => v.id === vId);
-                        const durationMinutes = period
-                          ? ((parseInt(period.end.split(":")[0]) * 60 + parseInt(period.end.split(":")[1])) - (parseInt(period.start.split(":")[0]) * 60 + parseInt(period.start.split(":")[1])))
-                          : 0;
+                        const durationMinutes = period ? periodDurationMinutes(period) : 0;
 
                         const isTech = key.includes("_TECH") || key.includes("_TECHNICAL") || role === "TECH" || role === "TECHNICAL";
                         const isStandby = vId === "GRADE" || key.includes("_STANDBY") || role === "STANDBY";

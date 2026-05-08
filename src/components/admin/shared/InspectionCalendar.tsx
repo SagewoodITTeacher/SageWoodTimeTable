@@ -13,8 +13,7 @@ import {
 import { CalendarRange } from "lucide-react";
 import { TimetableEntry, DayPeriodConfig } from "../../../types";
 import { DayMinutes } from "./types";
-import { PERIODS, WEDNESDAY_PERIODS } from "../../../constants";
-import { periodDurationMinutes } from "./helpers";
+import { periodDurationMinutes, resolvePeriodsForDate } from "./helpers";
 
 export const InspectionCalendar: React.FC<{
   teacherId: string;
@@ -28,17 +27,7 @@ export const InspectionCalendar: React.FC<{
       if (!entry.invigilatorAssignments) {
         continue;
       }
-      const d = parseISO(entry.date);
-      const dayName = format(d, "EEEE");
-      const dateConfig = dayPeriodConfigs.find((c) => c.id === entry.date);
-      const dayConfig = dayPeriodConfigs.find((c) => c.id === dayName);
-      const datePeriods = dateConfig
-        ? dateConfig.periods
-        : dayConfig
-          ? dayConfig.periods
-          : dayName === "Wednesday"
-            ? WEDNESDAY_PERIODS
-            : PERIODS;
+      const datePeriods = resolvePeriodsForDate(entry.date, dayPeriodConfigs);
       for (const [key, tId] of Object.entries(entry.invigilatorAssignments)) {
         if (tId !== teacherId) {
           continue;
