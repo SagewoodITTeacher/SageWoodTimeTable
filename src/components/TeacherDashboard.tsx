@@ -3,7 +3,7 @@ import { Teacher, LeaveRequest, HelpOption, HelpRequest } from '../types';
 import { format, parseISO, isSameDay, isWednesday, addMinutes } from 'date-fns';
 import { normalizeSubjectName, PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Clock, Calendar, Search, AlertCircle, Plus, X, Send, Info, Bell, MessageSquare, PhoneCall, Zap, User } from 'lucide-react';
+import { MapPin, Clock, Calendar, Search, AlertCircle, Plus, X, Send, Info, Bell, MessageSquare, PhoneCall, Zap, User, CheckCircle2 } from 'lucide-react';
 import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { Modal, useToast } from './ui';
@@ -533,61 +533,48 @@ export default function TeacherDashboard({ user, teachers }: Props) {
       </div>
 
       {/* Standby Live Notification Popup */}
-      <AnimatePresence>
-        {activeNotification && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-text-dark/90 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="relative w-full max-w-sm bg-white rounded-[32px] overflow-hidden shadow-2xl border-4 border-curro-red animate-pulse-slow"
-            >
-              <div className="p-8 flex flex-col items-center text-center">
-                <div className="w-20 h-20 bg-curro-red/10 text-curro-red rounded-full flex items-center justify-center mb-6 ring-8 ring-curro-red/5">
-                  <AlertCircle className="w-10 h-10" />
-                </div>
-                
-                <h3 className="text-xl font-black text-text-dark uppercase tracking-tight mb-2">HELP REQUESTED!</h3>
-                <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 w-full mb-6 text-left space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Venue</span>
-                    <span className="text-[11px] font-black text-text-dark uppercase">{activeNotification.venueName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Subject</span>
-                    <span className="text-[11px] font-black text-text-dark">{activeNotification.subject} (Gr {activeNotification.grade})</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[9px] font-black text-text-muted uppercase">Teacher</span>
-                    <span className="text-[11px] font-black text-text-dark">{activeNotification.invigilatorName}</span>
-                  </div>
-                  <div className="h-px bg-gray-200 my-2" />
-                  <div className="flex flex-col items-center pt-2">
-                    <span className="text-[9px] font-black text-text-muted uppercase mb-1">Issue Reported:</span>
-                    <span className="text-sm font-black text-curro-red uppercase italic">
-                      {activeNotification.option}
-                      {activeNotification.quantity ? ` (${activeNotification.quantity} required)` : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => handleAcknowledgeNotification(activeNotification)}
-                  className="w-full bg-curro-blue text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
-                >
-                  STATED: I RECEIVED (OK)
-                </button>
-              </div>
-            </motion.div>
+      <Modal
+        open={!!activeNotification}
+        onClose={() => activeNotification && handleAcknowledgeNotification(activeNotification)}
+        title="HELP REQUESTED!"
+        size="sm"
+      >
+        <div className="flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-curro-red/10 text-curro-red rounded-full flex items-center justify-center mb-6 ring-8 ring-curro-red/5">
+            <AlertCircle className="w-10 h-10" />
           </div>
-        )}
-      </AnimatePresence>
+
+          <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 w-full mb-6 text-left space-y-2">
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Venue</span>
+              <span className="text-xs font-black text-text-dark uppercase">{activeNotification?.venueName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Subject</span>
+              <span className="text-xs font-black text-text-dark">{activeNotification?.subject} (Gr {activeNotification?.grade})</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[10px] font-black text-text-muted uppercase">Teacher</span>
+              <span className="text-xs font-black text-text-dark">{activeNotification?.invigilatorName}</span>
+            </div>
+            <div className="h-px bg-gray-200 my-2" />
+            <div className="flex flex-col items-center pt-2">
+              <span className="text-[10px] font-black text-text-muted uppercase mb-1">Issue Reported:</span>
+              <span className="text-sm font-black text-curro-red uppercase italic">
+                {activeNotification?.option}
+                {activeNotification?.quantity ? ` (${activeNotification.quantity} required)` : ''}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => activeNotification && handleAcknowledgeNotification(activeNotification)}
+            className="w-full bg-curro-blue text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-blue-500/20 active:scale-95 transition-all"
+          >
+            STATED: I RECEIVED (OK)
+          </button>
+        </div>
+      </Modal>
 
       {/* Call Help Modal */}
       <Modal open={isHelpModalOpen} onClose={() => setIsHelpModalOpen(false)} title="Request help" size="md">
@@ -647,7 +634,7 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                     animate={{ opacity: 1, height: 'auto' }}
                     className="pt-4 space-y-3"
                   >
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="qp-quantity" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Number of Papers Required
                     </label>
                     <div className="flex items-center gap-4 bg-blue-50 p-2 rounded-2xl border border-blue-100">
@@ -701,10 +688,11 @@ export default function TeacherDashboard({ user, teachers }: Props) {
                 <div className="space-y-4">
                   {/* Leave Type */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-type" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Type of Leave
                     </label>
                     <select
+                      id="leave-type"
                       value={leaveType}
                       onChange={(e) => setLeaveType(e.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
@@ -717,13 +705,14 @@ export default function TeacherDashboard({ user, teachers }: Props) {
 
                   {/* Date Selection */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Date of Leave
                     </label>
                     <div className="relative">
                       <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                      <input 
+                      <input
                         type="date"
+                        id="leave-date"
                         required
                         value={leaveDate}
                         onChange={(e) => setLeaveDate(e.target.value)}
@@ -734,10 +723,11 @@ export default function TeacherDashboard({ user, teachers }: Props) {
 
                   {/* Reason */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
+                    <label htmlFor="leave-reason" className="text-[10px] font-black text-text-muted uppercase tracking-widest px-1">
                       Reason / Additional Notes
                     </label>
-                    <textarea 
+                    <textarea
+                      id="leave-reason"
                       required
                       value={leaveReason}
                       onChange={(e) => setLeaveReason(e.target.value)}
@@ -772,26 +762,6 @@ export default function TeacherDashboard({ user, teachers }: Props) {
               </form>
       </Modal>
     </div>
-  );
-}
-
-function CheckCircle2(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
   );
 }
 
