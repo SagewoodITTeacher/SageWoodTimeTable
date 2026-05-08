@@ -18,6 +18,7 @@ import { PERIODS, WEDNESDAY_PERIODS } from '../constants';
 import { motion, AnimatePresence } from 'motion/react';
 import { SectionCard, Modal } from './ui';
 import { computeWorkload } from '../lib/workload';
+import { APPROVERS, getPublicHolidays } from '../lib/staff-config';
 
 interface Props {
   user: Teacher;
@@ -25,8 +26,7 @@ interface Props {
 }
 
 const LANGUAGES = ['English', 'Afrikaans', 'Xhosa', 'Sepedi', 'Zulu', 'Sesotho'];
-const APPROVERS = ['MERV', 'PLAL', 'EZRN'];
-const PUBLIC_HOLIDAYS = ['2026-05-01', '2026-06-16'];
+const PUBLIC_HOLIDAYS = getPublicHolidays();
 
 export default function OperationalManager({ user, teachers }: Props) {
   const { data: entries } = useTimetableEntries();
