@@ -41,20 +41,20 @@ export function computeWorkload(
   const total = Object.fromEntries(teachers.map(t => [t.id, 0]));
 
   entries.forEach(entry => {
-    if (!entry.invigilatorAssignments) return;
+    if (!entry.invigilatorAssignments) { return; }
 
     const dc = dayPeriodConfigs.find(c => c.id === entry.date);
     const periodsToUse = dc?.periods || (format(parseISO(entry.date), 'EEEE') === 'Wednesday' ? WEDNESDAY_PERIODS : PERIODS);
 
     Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-      if (!total.hasOwnProperty(tid)) return;
+      if (!total.hasOwnProperty(tid)) { return; }
 
       const parts = key.split('_');
       const pIdx = parseInt(parts[0]);
       const vId = parts[1];
       const role = parts[2];
 
-      if (vId !== 'GRADE' && !entry.venueIds?.includes(vId)) return;
+      if (vId !== 'GRADE' && !entry.venueIds?.includes(vId)) { return; }
 
       const p = periodsToUse[pIdx];
       let duration = entry.durationMinutes || 120;

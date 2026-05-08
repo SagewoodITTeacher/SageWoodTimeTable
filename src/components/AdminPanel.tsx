@@ -4440,11 +4440,12 @@ function SubjectsModal({
     <Modal open onClose={onClose} title={`${teacher.firstName} ${teacher.lastName} – Subject Specialization`} size="md">
         <div className="space-y-6">
           <div className="space-y-3">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1 mb-1 block">
+            <label htmlFor="subject-master-list" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1 mb-1 block">
               Add Subject from Master List
             </label>
             <div className="flex gap-2">
               <select
+                id="subject-master-list"
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(e.target.value)}
                 className="flex-1 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none"
@@ -4904,11 +4905,12 @@ function BreakDutyModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+            <label htmlFor="break-duty-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
               Add New Date
             </label>
             <div className="flex gap-2">
               <input
+                id="break-duty-date"
                 type="date"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
@@ -5152,10 +5154,11 @@ function LeaveRequestModal({
             className="p-6 space-y-4 border-r border-gray-100"
           >
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="leave-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Leave Date
               </label>
               <input
+                id="leave-date"
                 required
                 type="date"
                 value={formData.date}
@@ -5167,10 +5170,11 @@ function LeaveRequestModal({
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="leave-type" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Leave Type
               </label>
               <select
+                id="leave-type"
                 value={formData.type}
                 onChange={(e) =>
                   setFormData({ ...formData, type: e.target.value as any })
@@ -5204,10 +5208,11 @@ function LeaveRequestModal({
             {!formData.isFullDay && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+                  <label htmlFor="leave-start-time" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                     Start Time
                   </label>
                   <input
+                    id="leave-start-time"
                     type="time"
                     value={formData.startTime}
                     onChange={(e) =>
@@ -5217,10 +5222,11 @@ function LeaveRequestModal({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+                  <label htmlFor="leave-end-time" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                     End Time
                   </label>
                   <input
+                    id="leave-end-time"
                     type="time"
                     value={formData.endTime}
                     onChange={(e) =>
@@ -5233,10 +5239,11 @@ function LeaveRequestModal({
             )}
 
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <label htmlFor="leave-reason" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                 Reason (Optional)
               </label>
               <textarea
+                id="leave-reason"
                 value={formData.reason}
                 onChange={(e) =>
                   setFormData({ ...formData, reason: e.target.value })
@@ -6448,10 +6455,11 @@ function VenueModal({
         <div>
           <div className="space-y-5 font-sans">
             <div>
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
+              <label htmlFor="venue-id" className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
                 Venue ID (e.g. HALL1)
               </label>
               <input
+                id="venue-id"
                 type="text"
                 disabled={!!venue}
                 value={formData.id}
@@ -6463,10 +6471,11 @@ function VenueModal({
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
+              <label htmlFor="venue-name" className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
                 Display Name
               </label>
               <input
+                id="venue-name"
                 type="text"
                 value={formData.name}
                 onChange={(e) =>
@@ -6478,10 +6487,11 @@ function VenueModal({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
+                <label htmlFor="venue-type" className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
                   Venue Type
                 </label>
                 <select
+                  id="venue-type"
                   value={formData.type}
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as any })
@@ -6494,10 +6504,11 @@ function VenueModal({
                 </select>
               </div>
               <div>
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
+                <label htmlFor="venue-capacity" className="text-[10px] font-black text-text-muted uppercase tracking-widest mb-1.5 ml-1 block">
                   Capacity
                 </label>
                 <input
+                  id="venue-capacity"
                   type="number"
                   value={formData.capacity}
                   onChange={(e) =>
@@ -7054,10 +7065,11 @@ function SchedulerTab({
           <div className="flex-1 max-w-xl bg-gray-50/80 rounded-3xl p-4 border border-gray-100 flex flex-col md:flex-row items-end gap-3 shadow-inner">
             <div className="flex-1 flex flex-col gap-2">
               <div className="w-full">
-                <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1 ml-1">
+                <label htmlFor="auto-from-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1 ml-1">
                   Auto-generate FROM
                 </label>
                 <input
+                  id="auto-from-date"
                   type="date"
                   value={autoFromDate}
                   onChange={(e) => setAutoFromDate(e.target.value)}
@@ -7066,7 +7078,7 @@ function SchedulerTab({
               </div>
               <div className="w-full">
                 <div className="flex items-center gap-2 mb-1 ml-1">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest block">
+                  <label htmlFor="auto-until-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest block">
                     Auto-complete UNTIL
                   </label>
                   {hasIncompleteVenues && (
@@ -7090,6 +7102,7 @@ function SchedulerTab({
                   )}
                 </div>
                 <input
+                  id="auto-until-date"
                   type="date"
                   min={autoFromDate}
                   value={autoUntilDate}
@@ -7156,7 +7169,7 @@ function SchedulerTab({
 
           <div className="flex flex-col">
             <div className="flex items-center justify-between mb-1.5 ml-1">
-              <label className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+              <label htmlFor="timetable-select-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest">
                 Select Date
               </label>
               <div className="flex items-center gap-3">
@@ -7186,6 +7199,7 @@ function SchedulerTab({
               </div>
             </div>
             <input
+              id="timetable-select-date"
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
@@ -8783,10 +8797,11 @@ function SubjectsTab({
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+                  <label htmlFor="subject-code" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                     Subject Code
                   </label>
                   <input
+                    id="subject-code"
                     type="text"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value.toUpperCase())}
@@ -8795,10 +8810,11 @@ function SubjectsTab({
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+                  <label htmlFor="subject-name" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
                     Full Name
                   </label>
                   <input
+                    id="subject-name"
                     type="text"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
