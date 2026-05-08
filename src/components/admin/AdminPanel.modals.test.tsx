@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Modal } from "./ui";
+import { Modal } from "../ui";
 
 describe("Modal a11y contract (used by AdminPanel sites)", () => {
   it("restores focus to the trigger on close", async () => {

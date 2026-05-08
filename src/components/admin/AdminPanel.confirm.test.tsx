@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ConfirmDialog } from "./ui";
+import { ConfirmDialog } from "../ui";
 
 describe("ClearAssignments confirmation", () => {
   it("disables the confirm button until 'CLEAR' is typed", async () => {
