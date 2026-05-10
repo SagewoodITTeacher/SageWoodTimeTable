@@ -1,6 +1,6 @@
 import { Teacher, TimetableEntry, DayPeriodConfig, PeriodConfig, LeaveRequest } from "../../../types";
 import { getCycleForDate, FAL_SUBJECTS, PERIODS, WEDNESDAY_PERIODS } from "../../../constants";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isBefore, isAfter } from "date-fns";
 import { OperationType } from "../../../firebase";
 
 export const getTimetableCell = (
@@ -262,6 +262,60 @@ export const SHEH_OVERRIDE_DATES = new Set(["2026-06-18", "2026-06-19"]);
 
 export const isSHEHOverride = (teacherId: string, dateStr: string): boolean => {
   return teacherId === "SHEH" && SHEH_OVERRIDE_DATES.has(dateStr);
+};
+
+export const hasGradeMarkerInPeriod = (
+  teacher: Teacher,
+  grade: number,
+  periodIdx: number,
+  dateStr: string,
+) => {
+  const cell = getTimetableCell(teacher, periodIdx, dateStr);
+  if (!cell) return false;
+  const cellStr = String(cell);
+  return cellStr.includes(`[${grade}]`);
+};
+
+export const isTeacherAllowedForGradeOnDate = (
+  teacher: any,
+  grade: number,
+  dateStr: string,
+  settings: any,
+  isStandby: boolean = false
+) => {
+  if (!dateStr || !settings) return true;
+  const d = parseISO(dateStr);
+  const isGrade12 = grade === 12;
+  const isGrade10_11 = grade === 10 || grade === 11;
+  const isGrade8_9 = grade === 8 || grade === 9;
+
+  // Reserve Range check
+  if (isStandby && settings.reserveRange?.start && settings.reserveRange?.end) {
+    const s = parseISO(settings.reserveRange.start);
+    const e = parseISO(settings.reserveRange.end);
+    if (isBefore(d, s) || isAfter(d, e)) return false;
+  }
+
+  // Grade 12 check
+  if (isGrade12 && settings.grade12Range?.start && settings.grade12Range?.end) {
+    const s = parseISO(settings.grade12Range.start);
+    const e = parseISO(settings.grade12Range.end);
+    if (isBefore(d, s) || isAfter(d, e)) return false;
+  }
+  // Grade 10-11 check
+  if (isGrade10_11 && settings.grade10_11Range?.start && settings.grade10_11Range?.end) {
+    const s = parseISO(settings.grade10_11Range.start);
+    const e = parseISO(settings.grade10_11Range.end);
+    if (isBefore(d, s) || isAfter(d, e)) return false;
+  }
+  // Grade 8-9 check
+  if (isGrade8_9 && settings.grade8_9Range?.start && settings.grade8_9Range?.end) {
+    const s = parseISO(settings.grade8_9Range.start);
+    const e = parseISO(settings.grade8_9Range.end);
+    if (isBefore(d, s) || isAfter(d, e)) return false;
+  }
+  
+  return true;
 };
 
 // --- Leave check ---

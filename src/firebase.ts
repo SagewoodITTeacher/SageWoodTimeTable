@@ -49,6 +49,17 @@ export interface FirestoreErrorInfo {
   operationType: OperationType;
   path: string | null;
   message: string;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
 }
 
 export function handleFirestoreError(
@@ -57,7 +68,24 @@ export function handleFirestoreError(
   path: string | null,
 ): never {
   const { code, message } = sanitizeError(error);
-  const errInfo: FirestoreErrorInfo = { code, operationType, path, message };
-  console.error('Firestore Error:', errInfo);
+  const errInfo: FirestoreErrorInfo = {
+    code,
+    operationType,
+    path,
+    message,
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+  };
+  console.error('Firestore Error:', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }

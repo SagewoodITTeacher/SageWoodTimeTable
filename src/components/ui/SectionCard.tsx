@@ -63,34 +63,35 @@ export function SectionCard({
     <section
       id={id}
       className={cn(
-        "bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden",
+        "bento-card overflow-hidden",
         className
       )}
     >
       <header
         className={cn(
-          "p-6 flex items-center justify-between",
-          v.header,
-          v.border
+          "p-8 flex items-center justify-between",
+          "bg-white/[0.02] border-b border-white/5",
+          // v.header, // Let's simplify and use the common bento header style
+          // v.border
         )}
       >
-        <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-5 min-w-0">
           {icon && (
             <div
               className={cn(
-                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0",
-                v.iconBg
+                "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-inner",
+                // v.iconBg
               )}
             >
               {icon}
             </div>
           )}
           <div className="min-w-0">
-            <h2 className="text-xl font-black uppercase tracking-tight leading-tight truncate">
+            <h2 className="text-xl font-black uppercase tracking-[0.2em] leading-tight truncate text-white">
               {title}
             </h2>
             {subtitle && (
-              <p className="text-white/60 text-xs font-black uppercase tracking-widest mt-0.5 truncate">
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.3em] mt-2 truncate">
                 {subtitle}
               </p>
             )}
@@ -98,7 +99,7 @@ export function SectionCard({
         </div>
         {headerActions && <div className="shrink-0 ml-4">{headerActions}</div>}
       </header>
-      <div>{children}</div>
+      <div className="p-8">{children}</div>
     </section>
   );
 }

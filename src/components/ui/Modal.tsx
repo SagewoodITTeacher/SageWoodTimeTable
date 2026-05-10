@@ -108,7 +108,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4"
       onMouseDown={(e) => {
         if (!dismissOnBackdrop) {
           return;
@@ -125,12 +125,12 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          "bg-white w-full rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] outline-none",
+          "bg-slate-900 w-full rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] outline-none border border-white/5",
           SIZE_CLASS[size]
         )}
       >
-        <div className="bg-curro-blue p-6 text-white flex items-center justify-between border-b-4 border-curro-red">
-          <h3 id={titleId} className="text-lg font-black leading-tight">
+        <div className="bg-white/[0.02] p-6 text-white flex items-center justify-between border-b border-white/5">
+          <h3 id={titleId} className="text-sm font-black uppercase tracking-[0.2em] text-indigo-400">
             {title}
           </h3>
           {!hideClose && (
@@ -138,13 +138,13 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Close dialog"
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="p-2 hover:bg-white/5 rounded-xl transition-all border border-transparent hover:border-white/10 hover:text-indigo-400"
             >
               <X className="w-5 h-5" />
             </button>
           )}
         </div>
-        <div ref={contentRef} className="flex-1 overflow-auto p-6">{children}</div>
+        <div ref={contentRef} className="flex-1 overflow-auto p-8 text-slate-300">{children}</div>
       </div>
     </div>,
     document.body

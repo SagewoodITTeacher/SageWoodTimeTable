@@ -258,35 +258,37 @@ export function SubjectsTab({
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
-        <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+      <div className="bento-card overflow-hidden min-h-[500px] flex flex-col">
+        <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
           <div>
-            <h3 className="font-black text-text-dark uppercase tracking-tight text-xs flex items-center gap-2">
-              <BookOpen className="w-3.5 h-3.5" />
+            <h3 className="font-black text-indigo-400 uppercase tracking-[0.2em] text-[10px] flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-inner">
+                <BookOpen className="w-4 h-4" />
+              </div>
               Master Subject List
             </h3>
-            <p className="text-[10px] text-text-muted font-bold mt-0.5">
+            <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-widest ml-11">
               Define subjects used throughout the program
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onBackup}
-              className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-blue-200/50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-indigo-500/20 shadow-sm"
             >
-              <Download className="w-3 h-3" />
-              <span className="hidden sm:inline">Subject JSON Backup</span>
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Backup JSON</span>
             </button>
             <button
               onClick={handleReconstructVisualArt}
-              className="px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100"
+              className="px-4 py-2 bg-amber-500/10 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all border border-amber-500/20 shadow-sm"
             >
-              Reconstruct Visual Art
+              Reconstruct VA
             </button>
             <button
               onClick={handleSyncAndLink}
               disabled={isSyncing}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all disabled:opacity-50 border border-emerald-100"
+              className="flex items-center gap-2 px-6 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all disabled:opacity-50 border border-emerald-500/20 shadow-sm"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`}
@@ -295,35 +297,36 @@ export function SubjectsTab({
             </button>
             <button
               onClick={() => setIsAdding(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-curro-blue text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-opacity-90 transition-all hover:scale-105 active:scale-95"
+              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all hover:scale-105 active:scale-95 border border-indigo-400/30"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               Add Manual
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-8">
           {isAdding || editingId ? (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-gray-50 p-6 rounded-2xl border border-gray-100 mb-8 max-w-2xl mx-auto shadow-inner"
+              className="bg-white/[0.02] p-8 rounded-[2rem] border border-white/5 mb-10 max-w-2xl mx-auto shadow-2xl relative overflow-hidden group"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-[10px] font-black text-curro-blue uppercase tracking-widest">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">
                   {editingId ? "Edit Subject" : "New Subject Entry"}
                 </h4>
                 <button
                   onClick={reset}
-                  className="text-text-muted hover:text-text-dark"
+                  className="p-2 text-slate-500 hover:text-white transition-colors"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="subject-code" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                <div className="flex flex-col gap-2.5">
+                  <label htmlFor="subject-code" className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
                     Subject Code
                   </label>
                   <input
@@ -332,11 +335,11 @@ export function SubjectsTab({
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value.toUpperCase())}
                     placeholder="e.g. MATH"
-                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
+                    className="px-5 py-3.5 bg-slate-950 border border-white/5 rounded-2xl text-sm font-bold text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-800 font-mono tracking-wider"
                   />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="subject-name" className="text-[10px] font-black text-text-muted uppercase tracking-widest ml-1">
+                <div className="flex flex-col gap-2.5">
+                  <label htmlFor="subject-name" className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
                     Full Name
                   </label>
                   <input
@@ -345,86 +348,86 @@ export function SubjectsTab({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="e.g. Mathematics"
-                    className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
+                    className="px-5 py-3.5 bg-slate-950 border border-white/5 rounded-2xl text-sm font-bold text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all placeholder:text-slate-800"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
+              <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-white/5 relative z-10">
                 <button
                   onClick={reset}
-                  className="px-6 py-2 rounded-lg text-[10px] font-black text-text-muted uppercase tracking-widest hover:text-text-dark transition-colors"
+                  className="px-6 py-2.5 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={!newCode || !newName || isSaving}
-                  className="flex items-center gap-2 px-8 py-2 bg-curro-blue text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-2 px-10 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all active:scale-95 disabled:opacity-30 border border-indigo-400/30"
                 >
-                  <Save className="w-3.5 h-3.5" />
+                  <Save className="w-4 h-4" />
                   {isSaving ? "Saving..." : "Confirm"}
                 </button>
               </div>
             </motion.div>
           ) : null}
 
-          <div className="space-y-8">
+          <div className="space-y-12">
             <div>
-              <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ml-1">
-                <Database className="w-3 h-3" />
+              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6 flex items-center gap-3 ml-2">
+                <Database className="w-4 h-4" />
                 Current Master List ({subjects.length})
               </h4>
-              <div className="overflow-hidden border border-gray-100 rounded-2xl shadow-sm bg-white">
+              <div className="overflow-hidden border border-white/5 rounded-2xl shadow-2xl bg-white/[0.01]">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="px-6 py-3 text-[10px] font-black text-text-muted uppercase tracking-widest">
+                    <tr className="bg-white/[0.03] border-b border-white/5">
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                         Code
                       </th>
-                      <th className="px-6 py-3 text-[10px] font-black text-text-muted uppercase tracking-widest">
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                         Full Subject Name
                       </th>
-                      <th className="px-6 py-3 text-[10px] font-black text-text-muted uppercase tracking-widest text-right">
+                      <th className="px-8 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-white/[0.02]">
                     {subjects.length > 0 ? (
                       subjects
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((s) => (
                           <tr
                             key={s.id}
-                            className="hover:bg-blue-50/30 transition-colors group"
+                            className="hover:bg-indigo-500/[0.03] transition-colors group"
                           >
-                            <td className="px-6 py-4">
-                              <span className="px-2 py-1 bg-blue-50 text-curro-blue text-[10px] font-black rounded border border-blue-100">
+                            <td className="px-8 py-5">
+                              <span className="px-3 py-1.5 bg-indigo-500/10 text-indigo-400 text-[10px] font-black rounded-lg border border-indigo-500/20 font-mono tracking-wider">
                                 {s.code}
                               </span>
                             </td>
-                            <td className="px-6 py-4">
-                              <span className="text-sm font-bold text-text-dark">
+                            <td className="px-8 py-5">
+                              <span className="text-sm font-bold text-slate-200">
                                 {s.name}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <td className="px-8 py-5 text-right">
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                                 <button
                                   onClick={() => {
                                     setEditingId(s.id!);
                                     setNewCode(s.code);
                                     setNewName(s.name);
                                   }}
-                                  className="p-1.5 hover:bg-blue-100 text-curro-blue rounded-lg transition-colors"
+                                  className="p-2.5 hover:bg-indigo-500/20 text-indigo-400 rounded-xl transition-all border border-transparent hover:border-indigo-500/20"
                                 >
-                                  <Edit2 className="w-3.5 h-3.5" />
+                                  <Edit2 className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(s.id!)}
-                                  className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                                  className="p-2.5 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all border border-transparent hover:border-rose-500/20"
                                 >
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
                             </td>
@@ -434,7 +437,7 @@ export function SubjectsTab({
                       <tr>
                         <td
                           colSpan={3}
-                          className="px-6 py-12 text-center text-text-muted italic text-[10px] uppercase font-black tracking-widest opacity-40"
+                          className="px-8 py-20 text-center text-slate-700 italic text-[11px] uppercase font-black tracking-[0.3em]"
                         >
                           Empty Master Registry
                         </td>
@@ -446,18 +449,19 @@ export function SubjectsTab({
             </div>
 
             {/* Extract Faculty Subjects Preview */}
-            <div className="mt-12 bg-gray-50/50 p-8 rounded-[32px] border border-gray-100">
-              <h4 className="text-[10px] font-black text-text-muted uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ml-1">
-                <Users className="w-3 h-3" />
+            <div className="mt-16 bg-white/[0.01] p-10 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.01] to-transparent pointer-events-none" />
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-3 flex items-center gap-3 relative z-10">
+                <Users className="w-4 h-4" />
                 Extracted from Faculty Profiles
               </h4>
-              <p className="text-[10px] text-text-muted italic mb-6 ml-1">
+              <p className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.15em] mb-10 relative z-10">
                 These are the subjects currently defined in the faculty member
                 profiles. Use the sync button above to import missing ones into
                 the master registry.
               </p>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 relative z-10">
                 {Array.from(
                   new Set(
                     teachers
@@ -473,14 +477,14 @@ export function SubjectsTab({
                     return (
                       <div
                         key={idx}
-                        className={`p-4 rounded-2xl border flex flex-col gap-1 ${isInMaster ? "bg-white border-emerald-100" : "bg-white border-gray-200 opacity-60 shadow-inner"}`}
+                        className={`p-6 rounded-3xl border transition-all hover:scale-[1.02] flex flex-col gap-2 ${isInMaster ? "bg-white/[0.02] border-indigo-500/20 shadow-lg shadow-indigo-500/5" : "bg-slate-950/20 border-white/5 opacity-50 gray-scale"}`}
                       >
-                        <span className="text-xs font-bold text-text-dark leading-tight">
+                        <span className="text-xs font-bold text-slate-200 leading-tight">
                           {name}
                         </span>
                         {isInMaster && (
-                          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> IN MASTER
+                          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mt-2 flex items-center gap-2">
+                            <CheckCircle2 className="w-3 h-3" /> REGISTERED
                           </span>
                         )}
                       </div>

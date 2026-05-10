@@ -1,7 +1,14 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
-  },
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "ai-studio-19eb281a-3395-464f-9b30-6f19e03a83e9",
+      "rules": "firestore.rules"
+    }
+  ],
   "emulators": {
     "firestore": {
       "port": 8080

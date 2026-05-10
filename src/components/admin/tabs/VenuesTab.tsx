@@ -57,46 +57,48 @@ export function VenuesTab({
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 text-xs font-sans">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-        <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+      <div className="bento-card overflow-hidden flex flex-col min-h-[500px]">
+        <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
           <div>
-            <h3 className="font-black text-text-dark uppercase tracking-tight text-sm flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-curro-red" />
+            <h3 className="font-black text-indigo-400 uppercase tracking-[0.2em] text-[10px] flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shadow-inner">
+                <MapPin className="w-4 h-4 text-rose-400" />
+              </div>
               Examination Venues
             </h3>
-            <p className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-1">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2 ml-11">
               Manage halls, labs and standard classrooms
             </p>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onBackup}
-              className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-emerald-200/50 shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-emerald-500/20 shadow-sm"
               title="Backup Venue Data"
             >
-              <Download className="w-3 h-3" />
-              <span className="hidden sm:inline">Venue JSON Backup</span>
+              <Download className="w-3 link-3" />
+              <span className="hidden sm:inline">Backup JSON</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-curro-blue text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all"
+              className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:bg-indigo-500 transition-all hover:scale-105 active:scale-95 border border-indigo-400/30"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               Add Venue
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-8">
           {venues.length === 0 ? (
-            <div className="col-span-full py-20 flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4 text-gray-300">
-                <Building2 className="w-8 h-8" />
+            <div className="col-span-full py-24 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-white/[0.02] rounded-[2rem] border border-white/5 flex items-center justify-center mb-6 text-slate-700 shadow-inner">
+                <Building2 className="w-10 h-10" />
               </div>
-              <h4 className="text-sm font-black text-text-dark uppercase tracking-tight">
+              <h4 className="text-sm font-black text-slate-400 uppercase tracking-[0.2em]">
                 No Venues Found
               </h4>
-              <p className="text-xs font-medium text-text-muted mt-1">
+              <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-3">
                 Start by adding your first examination venue.
               </p>
             </div>
@@ -105,66 +107,67 @@ export function VenuesTab({
               <motion.div
                 key={venue.id}
                 layout
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-white border border-gray-100 rounded-2xl p-5 hover:border-curro-blue/20 hover:shadow-xl hover:shadow-blue-500/5 transition-all group relative overflow-hidden"
+                className="bg-white/[0.02] border border-white/5 rounded-[2rem] p-6 hover:bg-white/[0.04] transition-all group relative overflow-hidden shadow-xl hover:shadow-indigo-500/5 hover:border-white/10 active:scale-[0.98]"
               >
-                <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.02] to-transparent pointer-events-none" />
+                <div className="absolute top-2 right-2 p-2 opacity-0 group-hover:opacity-100 transition-all flex items-center gap-1 z-10 translate-y-2 group-hover:translate-y-0">
                   <button
                     onClick={() => setEditingVenue(venue)}
-                    className="p-1.5 hover:bg-gray-100 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+                    className="p-2.5 hover:bg-indigo-500/20 text-indigo-400 rounded-xl transition-all border border-transparent hover:border-indigo-500/20"
                   >
-                    <Edit2 className="w-3.5 h-3.5" />
+                    <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(venue.id)}
-                    className="p-1.5 hover:bg-red-50 text-text-muted hover:text-red-600 rounded-lg transition-colors"
+                    className="p-2.5 hover:bg-rose-500/20 text-rose-400 rounded-xl transition-all border border-transparent hover:border-rose-500/20"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
 
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-5 relative z-10">
                   <div
-                    className={`p-3 rounded-xl ${
+                    className={`p-4 rounded-2xl border shadow-inner ${
                       venue.type === "Lab"
-                        ? "bg-purple-50 text-purple-600"
+                        ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
                         : venue.type === "Hall"
-                          ? "bg-amber-50 text-amber-600"
-                          : "bg-blue-50 text-curro-blue"
+                          ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                          : "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
                     }`}
                   >
                     {venue.type === "Lab" ? (
-                      <FlaskConical className="w-5 h-5" />
+                      <FlaskConical className="w-6 h-6" />
                     ) : venue.type === "Hall" ? (
-                      <Building2 className="w-5 h-5" />
+                      <Building2 className="w-6 h-6" />
                     ) : (
-                      <School className="w-5 h-5" />
+                      <School className="w-6 h-6" />
                     )}
                   </div>
-                  <div>
-                    <h4 className="font-black text-text-dark text-sm uppercase tracking-tight">
+                  <div className="min-w-0">
+                    <h4 className="font-black text-white text-sm uppercase tracking-[0.1em] truncate group-hover:text-indigo-400 transition-colors">
                       {venue.name}
                     </h4>
-                    <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1 block">
                       {venue.type} Venue
                     </span>
 
-                    <div className="mt-4 flex items-center gap-4">
+                    <div className="mt-8 flex items-center gap-6">
                       <div className="flex flex-col">
-                        <span className="text-xs font-mono font-bold text-text-dark">
+                        <span className="text-sm font-mono font-bold text-white">
                           {venue.capacity}
                         </span>
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-1">
                           Learners
                         </span>
                       </div>
-                      <div className="w-px h-6 bg-gray-100" />
-                      <div className="flex flex-col">
-                        <span className="text-xs font-mono font-bold text-curro-blue">
-                          ID: {venue.id}
+                      <div className="w-px h-8 bg-white/5" />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-mono font-bold text-indigo-400 truncate">
+                          {venue.id}
                         </span>
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+                        <span className="text-[9px] font-black text-slate-600 uppercase tracking-widest mt-1">
                           Static Code
                         </span>
                       </div>

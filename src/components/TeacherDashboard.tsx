@@ -328,207 +328,204 @@ export default function TeacherDashboard({ user, teachers }: Props) {
   const totalItems = combinedSchedule.length;
 
   return (
-    <div className="flex flex-col pb-12 overflow-x-hidden">
+    <div className="flex flex-col pb-12 overflow-x-hidden space-y-6">
       {/* Hidden audio for notifications */}
       <audio ref={audioRef} src="/sounds/help-alert.mp3" preload="auto" />
 
-      {/* Salutation Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-curro-blue text-white px-5 pb-8 pt-4 -mx-4 md:-mx-8 mb-0 flex flex-col items-center text-center shadow-xl relative overflow-hidden"
-      >
-        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-          <Zap className="w-64 h-64 -ml-20 -mt-10 rotate-12" />
-        </div>
-
-        <div className="text-xs opacity-80 mb-1 font-black uppercase tracking-[0.2em]">
-          {format(parseISO(selectedDate), 'EEEE, d MMMM yyyy')}
-        </div>
-        <h2 className="text-2xl font-black leading-tight mb-4 relative z-10 transition-all">
-          {isSameDay(dateObj, new Date()) ? 'Invigilating Now' : `Hello, ${user.firstName}!`}
-        </h2>
+      {/* Bento Layout Grid */}
+      <div className="grid grid-cols-12 gap-6 items-start">
         
-        {/* Date Picker & Action */}
-        <div className="relative z-10 w-full max-w-xs flex flex-col gap-3">
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
-            <Calendar className="w-4 h-4 text-white/60" />
-            <input 
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-white text-xs font-black uppercase tracking-widest outline-none w-full [color-scheme:dark]"
-            />
-          </div>
+        {/* Salutation Header - Bento Style */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="col-span-12 lg:col-span-8 bento-card bg-gradient-to-br from-indigo-600/20 to-violet-700/20 flex flex-col md:flex-row items-center md:items-end justify-between gap-6 overflow-hidden relative"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
           
-          <button 
-            onClick={() => setIsLeaveModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-white text-curro-blue px-4 py-2.5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-900/20 active:scale-95 transition-all w-full"
-          >
-            <Plus className="w-4 h-4" />
-            Request Leave
-          </button>
-        </div>
-      </motion.div>
-
-      {/* Main Content */}
-      <div className="flex flex-col -mt-4 relative z-20 px-4">
-        
-        <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-gray-100 overflow-hidden mb-6">
-          <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
-            <h3 className="text-[10px] font-black text-text-muted uppercase tracking-widest flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-curro-blue" />
-              Your Daily View
-            </h3>
-            <span className="bg-curro-blue/10 text-curro-blue px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter">
-              {totalItems} Tasks
-            </span>
+          <div className="relative z-10 flex flex-col gap-2">
+            <div className="text-xs font-bold text-indigo-400 uppercase tracking-[0.25em]">
+              {format(parseISO(selectedDate), 'EEEE, d MMMM yyyy')}
+            </div>
+            <h2 className="text-4xl font-black text-white leading-tight">
+              {isSameDay(dateObj, new Date()) ? "You're on Duty" : `Hi, ${user.firstName}!`}
+            </h2>
+            <p className="text-slate-400 text-sm max-w-sm mt-1">
+              {isSameDay(dateObj, new Date()) 
+                ? "Your invigilation schedule is ready. Stay sharp and reach out if you need support."
+                : "View your upcoming assignments and manage your leave requests."}
+            </p>
           </div>
 
-          <div className="divide-y divide-gray-50">
-            {totalItems === 0 ? (
-              <div className="p-10 flex flex-col items-center text-center bg-gray-50/50">
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-sm">
-                  <Calendar className="w-6 h-6 text-gray-300" />
-                </div>
-                <p className="text-xs font-bold text-text-muted uppercase tracking-widest leading-relaxed">
-                  No invigilation assigned <br/> for this date.
-                </p>
-              </div>
-            ) : (
-              <>
-                {combinedSchedule.map((item, idx) => {
-                  const isCurrent = currentTimeStr >= item.time && currentTimeStr < item.endTime;
-                  return (
-                    <motion.div 
-                      key={item.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className={`p-5 flex items-center gap-5 transition-all ${isCurrent ? 'bg-blue-50/50 relative' : 'hover:bg-gray-50 opacity-100 grayscale-[0.3]'}`}
-                    >
-                      {isCurrent && <div className="absolute top-0 left-0 bottom-0 w-1 bg-curro-blue" />}
-                      <div className="flex flex-col items-center min-w-[60px]">
-                        <span className={`text-sm font-black font-mono ${isCurrent ? 'text-curro-blue' : 'text-text-dark'}`}>
-                          {item.time}
-                        </span>
-                        <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">
-                          {item.label}
-                        </span>
-                        <div className="w-10 h-px bg-gray-100 my-1.5" />
-                        <span className="text-xs font-black text-text-muted font-mono">
-                          {item.endTime}
-                        </span>
-                      </div>
-                      
-                      <div className="flex flex-col flex-1">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <MapPin className="w-3.5 h-3.5 text-curro-red" />
-                          <span className="text-[10px] font-black text-text-dark uppercase tracking-tighter">
-                            {item.venueName}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-text-dark leading-tight group-hover:text-curro-blue transition-colors">
-                          {item.subject} {item.type === 'period' && item.paperType !== 'Normal' ? `(${item.paperType})` : ''}
-                        </h4>
-                        <div className="mt-1 flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isCurrent ? 'bg-curro-blue text-white border-curro-blue' : 'bg-curro-blue/10 text-curro-blue border-curro-blue/10'}`}>
-                            Grade {item.grade}
-                          </span>
-                          {item.type === 'period' ? (
-                            <span className="text-[10px] font-black bg-gray-100 text-text-muted px-1.5 py-0.5 rounded uppercase tracking-tighter">
-                              {item.session}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-black text-white bg-curro-blue px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                              {/* @ts-ignore */}
-                              {item.status}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </>
-            )}
+          <div className="relative z-10 w-full md:w-64 flex flex-col gap-3">
+            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl">
+              <Calendar className="w-4 h-4 text-indigo-400" />
+              <input 
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-white text-xs font-bold uppercase tracking-widest outline-none w-full [color-scheme:dark]"
+              />
+            </div>
+            
+            <button 
+              onClick={() => setIsLeaveModalOpen(true)}
+              className="group flex items-center justify-center gap-2 bg-white text-slate-900 px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl shadow-indigo-500/10"
+            >
+              <Plus className="w-4 h-4 transition-transform group-hover:rotate-90" />
+              Request Leave
+            </button>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Support Section - Constantly Visible HUD */}
-        <div className={`mt-0 mb-6 bg-white rounded-2xl p-5 border shadow-xl transition-all ${currentActivity ? 'border-curro-blue/20' : 'border-gray-100 opacity-80'}`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 text-white rounded-xl shadow-md rotate-3 transition-colors ${currentActivity ? 'bg-curro-blue' : 'bg-gray-400'}`}>
-                <Bell className={`w-4 h-4 ${currentActivity ? 'animate-pulse' : ''}`} />
+        {/* Support Section - Bento Style */}
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className={`col-span-12 lg:col-span-4 bento-card flex flex-col justify-between h-full min-h-[280px] ${currentActivity ? 'bento-card-active' : ''}`}
+        >
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-colors ${currentActivity ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
+                <Bell className={`w-6 h-6 ${currentActivity ? 'animate-pulse' : ''}`} />
               </div>
               <div>
-                <h4 className="text-sm font-black text-text-dark uppercase tracking-tight">Main Hall Team</h4>
-                <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">
-                  Rapid Response • Grade {currentActivity?.grade || 'N/A'}
-                </p>
+                <h4 className="text-sm font-bold text-slate-200 uppercase tracking-tight">Active Status</h4>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className={`w-2 h-2 rounded-full ${currentActivity ? 'bg-green-400 animate-pulse' : 'bg-slate-600'}`}></div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    {currentActivity ? 'On Session' : 'No Duty Now'}
+                  </span>
+                </div>
               </div>
             </div>
-            {nextInvigilatorName && (
-              <div className="text-right">
-                <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest block">Next Takeover</span>
-                <span className="text-[10px] font-black text-text-dark">{nextInvigilatorName}</span>
+            {currentActivity && (
+              <div className="bg-indigo-500/10 text-indigo-400 px-2.5 py-1 rounded-lg text-[10px] font-bold border border-indigo-500/20 uppercase tracking-tighter">
+                Grade {currentActivity.grade}
               </div>
             )}
           </div>
 
-          {/* Progress Bar */}
-          <div className="mb-4">
-            <div className="flex justify-between items-end mb-1.5">
-              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">Session Progress</span>
-              <span className={`text-[10px] font-black font-mono ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`}>
+          <div className="space-y-4 mb-6">
+            <div className="flex justify-between items-end">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Session Completion</span>
+              <span className={`text-xs font-bold font-mono ${currentActivity ? 'text-indigo-400' : 'text-slate-600'}`}>
                 {Math.round(progressPercent)}%
               </span>
             </div>
-            <div className="h-4 bg-gray-100 rounded-full overflow-hidden p-0.5 border border-gray-50">
+            <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
               <motion.div 
                 initial={false}
                 animate={{ width: `${progressPercent}%` }}
-                className={`h-full rounded-full relative transition-colors ${currentActivity ? 'bg-gradient-to-r from-curro-blue to-blue-400' : 'bg-gray-300'}`}
-              >
-                <div className="absolute top-0 right-0 w-2 h-full bg-white/20 blur-sm" />
-              </motion.div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <MapPin className={`w-3 h-3 ${currentActivity ? 'text-curro-red' : 'text-gray-400'}`} />
-                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Current Venue</span>
-              </div>
-              <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
-                {currentActivity?.venueName || 'None Active'}
-              </div>
-            </div>
-            <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <User className={`w-3 h-3 ${currentActivity ? 'text-curro-blue' : 'text-gray-400'}`} />
-                <span className="text-[10px] font-black text-text-muted uppercase tracking-tighter">Standby Support</span>
-              </div>
-              <div className={`text-[11px] font-black truncate ${currentActivity ? 'text-text-dark' : 'text-text-muted italic'}`}>
-                {/* @ts-ignore */}
-                {currentActivity?.standbyName || 'N/A'}
-              </div>
+                className={`h-full rounded-full transition-colors ${currentActivity ? 'bg-gradient-to-r from-indigo-500 to-indigo-400' : 'bg-slate-700'}`}
+              />
             </div>
           </div>
           
           <button 
             disabled={!currentActivity}
             onClick={() => setIsHelpModalOpen(true)}
-            className={`w-full text-white text-[11px] font-black py-3 rounded-xl uppercase tracking-[0.2em] shadow-lg transition-all flex items-center justify-center gap-2 ${
-              currentActivity ? 'bg-curro-red shadow-red-500/20 active:scale-95' : 'bg-gray-300 shadow-none grayscale cursor-not-allowed'
+            className={`w-full text-[11px] font-bold py-4 rounded-xl uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
+              currentActivity 
+                ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20 hover:bg-rose-700 active:scale-95' 
+                : 'bg-slate-800 text-slate-500 shadow-none grayscale cursor-not-allowed'
             }`}
           >
             <PhoneCall className="w-4 h-4" />
-            {currentActivity ? 'Call HELP' : 'No Active Session'}
+            {currentActivity ? 'Call Assistance' : 'System Standby'}
           </button>
-        </div>
+        </motion.div>
+
+        {/* Daily Schedule Card */}
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="col-span-12 bento-card p-0 overflow-hidden"
+        >
+          <div className="px-8 py-6 border-b border-slate-800/50 flex items-center justify-between bg-white/[0.02]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-indigo-500/10 rounded-lg flex items-center justify-center">
+                <Clock className="w-4 h-4 text-indigo-400" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest">
+                Daily Assignment Flow
+              </h3>
+            </div>
+            <div className="bg-slate-800/80 px-3 py-1 rounded-full text-[10px] font-bold text-slate-400 uppercase tracking-tighter border border-slate-700">
+              {totalItems} Scheduled Events
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-800/30">
+            {totalItems === 0 ? (
+              <div className="p-20 flex flex-col items-center text-center bg-slate-900/20">
+                <div className="w-16 h-16 bg-slate-800 rounded-3xl flex items-center justify-center mb-6 shadow-inner border border-slate-700">
+                  <Calendar className="w-8 h-8 text-slate-600" />
+                </div>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed">
+                  Clear Schedule <br/> for this date.
+                </p>
+              </div>
+            ) : (
+              combinedSchedule.map((item, idx) => {
+                const isCurrent = currentTimeStr >= item.time && currentTimeStr < item.endTime;
+                return (
+                  <motion.div 
+                    key={item.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className={`p-6 flex items-center gap-8 transition-all ${isCurrent ? 'bg-indigo-500/5 relative' : 'hover:bg-white/[0.02]'}`}
+                  >
+                    {isCurrent && <div className="absolute top-0 left-0 bottom-0 w-1 bg-indigo-500" />}
+                    
+                    <div className="flex flex-col items-center min-w-[80px]">
+                      <span className={`text-lg font-black font-mono tracking-tighter ${isCurrent ? 'text-indigo-400' : 'text-slate-300'}`}>
+                        {item.time}
+                      </span>
+                      <div className="w-8 h-[2px] bg-slate-800 my-2" />
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">
+                        {item.label}
+                      </span>
+                    </div>
+                    
+                    <div className="flex flex-col flex-1">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">
+                          {item.venueName}
+                        </span>
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-200 leading-tight">
+                        {item.subject} {item.type === 'period' && item.paperType !== 'Normal' ? <span className="text-slate-500 font-medium text-sm">({item.paperType})</span> : ''}
+                      </h4>
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className={`text-[10px] font-bold px-3 py-1 rounded-lg border uppercase tracking-[0.1em] ${isCurrent ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg shadow-indigo-500/20' : 'bg-slate-800/50 text-slate-400 border-slate-700'}`}>
+                          Grade {item.grade}
+                        </div>
+                        {item.type === 'period' ? (
+                          <div className="text-[10px] font-bold bg-slate-800/30 text-slate-500 px-3 py-1 rounded-lg border border-slate-800 uppercase tracking-[0.1em]">
+                            {item.session} Session
+                          </div>
+                        ) : (
+                          <div className="text-[10px] font-bold text-white bg-indigo-500 px-3 py-1 rounded-lg uppercase tracking-[0.1em] shadow-lg shadow-indigo-500/10">
+                            {/* @ts-ignore */}
+                            {item.status}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="hidden md:flex flex-col items-end min-w-[120px]">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Ends At</span>
+                      <span className="text-sm font-bold text-slate-400 font-mono italic">{item.endTime}</span>
+                    </div>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+        </motion.div>
 
       </div>
 

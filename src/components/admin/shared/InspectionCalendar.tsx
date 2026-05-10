@@ -102,16 +102,13 @@ export const InspectionCalendar: React.FC<{
 
   if (dateBuckets.size === 0) {
     return (
-      <div className="p-20 text-center flex flex-col items-center">
-        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-          <CalendarRange className="w-8 h-8 text-gray-300" />
+      <div className="py-24 text-center flex flex-col items-center">
+        <div className="w-24 h-24 bg-slate-950 rounded-[2rem] flex items-center justify-center mb-6 shadow-2xl border border-white/5">
+          <CalendarRange className="w-10 h-10 text-slate-800" />
         </div>
-        <h4 className="text-lg font-black text-text-dark uppercase tracking-tight">
-          No assignments yet
-        </h4>
-        <p className="text-text-muted text-xs font-medium max-w-xs mx-auto mt-2 leading-relaxed">
-          This teacher has no invigilation assignments. Check back once the
-          scheduler has run.
+        <h4 className="text-xl font-black text-white uppercase tracking-tight">No Deployment Data</h4>
+        <p className="text-slate-500 text-sm font-medium max-w-xs mx-auto mt-4 leading-relaxed">
+          This faculty member has no active session assignments. Run the scheduler to populate logs.
         </p>
       </div>
     );
@@ -121,42 +118,50 @@ export const InspectionCalendar: React.FC<{
   const weekDayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
-    <div className="p-6 overflow-y-auto max-h-[calc(100vh-22rem)] min-h-[500px]">
-      <div className="flex items-center gap-4 mb-4 text-[10px] font-black text-text-muted uppercase tracking-widest">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-curro-blue" /> Morning
+    <div className="p-2 overflow-y-auto max-h-[calc(100vh-28rem)] min-h-[500px] scrollbar-thin scrollbar-thumb-white/10">
+      <div className="flex flex-wrap items-center gap-6 mb-8 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] bg-slate-900/50 p-4 rounded-xl border border-white/5">
+        <span className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-indigo-500 shadow-[0_0_8px_rgba(79,70,229,0.4)]" /> Morning
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-emerald-500" /> Afternoon
+        <span className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" /> Afternoon
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-curro-red" /> Tech
+        <span className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" /> Technical
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-amber-500" /> Standby
+        <span className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]" /> Standby
         </span>
-        <span className="ml-2 text-text-muted">Numbers are minutes assigned</span>
+        <div className="ml-auto flex items-center gap-2 opacity-60">
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+          <span>Values represent Minutes Assigned</span>
+        </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
         {monthGrids.map((m) => (
           <div
             key={m.monthKey}
-            className="border border-gray-100 rounded-2xl p-4 bg-white shadow-sm"
+            className="group/month bg-white/[0.01] rounded-[2rem] border border-white/5 p-6 hover:bg-white/[0.02] transition-colors relative"
           >
-            <h4 className="text-sm font-black text-text-dark uppercase tracking-tight mb-3">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.01] to-transparent pointer-events-none rounded-[2rem]" />
+            <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 px-1 flex items-center justify-between relative z-10">
               {m.title}
+              <div className="h-px flex-1 bg-white/5 ml-4" />
             </h4>
-            <div className="grid grid-cols-7 gap-1 mb-2">
+            
+            <div className="grid grid-cols-7 gap-2 mb-4 relative z-10">
               {weekDayLabels.map((d) => (
                 <div
                   key={d}
-                  className="text-[10px] font-black text-text-muted uppercase tracking-widest text-center py-1"
+                  className="text-[9px] font-black text-slate-600 uppercase tracking-widest text-center py-2"
                 >
                   {d}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 gap-1">
+
+            <div className="grid grid-cols-7 gap-2 relative z-10">
               {Array.from({ length: m.leadingBlanks }).map((_, i) => (
                 <div key={`blank-${i}`} />
               ))}
@@ -164,57 +169,57 @@ export const InspectionCalendar: React.FC<{
                 const iso = format(d, "yyyy-MM-dd");
                 const bucket = dateBuckets.get(iso);
                 const isToday = isSameDay(d, today);
+                
                 if (!bucket) {
                   return (
                     <div
                       key={iso}
-                      className={`min-h-[64px] rounded-lg flex items-center justify-center text-[11px] font-bold text-gray-300 ${isToday ? "ring-1 ring-curro-blue/40" : ""}`}
+                      className={`min-h-[72px] rounded-xl flex items-center justify-center text-xs font-black text-slate-800 border border-transparent ${isToday ? "ring-1 ring-indigo-500/30 bg-indigo-500/[0.02]" : ""}`}
                     >
                       {format(d, "d")}
                     </div>
                   );
                 }
-                const total =
-                  bucket.morning +
-                  bucket.afternoon +
-                  bucket.tech +
-                  bucket.standby;
+
+                const total = bucket.morning + bucket.afternoon + bucket.tech + bucket.standby;
+                
                 return (
                   <button
                     key={iso}
                     onClick={() => onPickDate(iso)}
-                    className={`min-h-[64px] rounded-lg overflow-hidden bg-white border border-gray-100 hover:border-curro-blue hover:shadow-md transition-all flex flex-col text-left ${isToday ? "ring-2 ring-curro-blue" : ""}`}
-                    title={`${format(d, "EEEE d MMM")} — Morning ${bucket.morning} min · Afternoon ${bucket.afternoon} min · Tech ${bucket.tech} min · Standby ${bucket.standby} min · Total ${total} min`}
+                    className={`min-h-[72px] rounded-xl overflow-hidden bg-slate-950/40 border border-white/5 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10 transition-all flex flex-col group/day relative ${isToday ? "ring-2 ring-indigo-500" : ""}`}
+                    title={`${format(d, "EEEE d MMM")} — Total ${total} min`}
                   >
-                    <div className="flex items-center justify-between px-1 pt-0.5">
-                      <span className="text-[11px] font-black text-text-dark leading-none">
+                    <div className="flex items-center justify-between px-2 pt-1.5 pb-1 relative z-10">
+                      <span className="text-xs font-black text-white leading-none">
                         {format(d, "d")}
                       </span>
-                      <span className="text-[10px] font-black text-text-muted leading-none">
+                      <span className="text-[9px] font-black text-slate-500 group-hover/day:text-indigo-400 font-mono leading-none">
                         {total}m
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 grid-rows-2 flex-1 gap-px mt-0.5 bg-gray-100">
+                    
+                    <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-[1px] bg-white/[0.03] mt-auto">
                       <div
-                        className={`flex items-center justify-center text-[10px] font-black ${bucket.morning > 0 ? "bg-curro-blue text-white" : "bg-blue-50 text-blue-200"}`}
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.morning > 0 ? "bg-indigo-600 text-white" : "bg-transparent text-slate-800"}`}
                         title={`Morning: ${bucket.morning} min`}
                       >
                         {bucket.morning || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[10px] font-black ${bucket.afternoon > 0 ? "bg-emerald-500 text-white" : "bg-emerald-50 text-emerald-200"}`}
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.afternoon > 0 ? "bg-emerald-600 text-white" : "bg-transparent text-slate-800"}`}
                         title={`Afternoon: ${bucket.afternoon} min`}
                       >
                         {bucket.afternoon || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[10px] font-black ${bucket.tech > 0 ? "bg-curro-red text-white" : "bg-red-50 text-red-200"}`}
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.tech > 0 ? "bg-rose-600 text-white" : "bg-transparent text-slate-800"}`}
                         title={`Tech: ${bucket.tech} min`}
                       >
                         {bucket.tech || ""}
                       </div>
                       <div
-                        className={`flex items-center justify-center text-[10px] font-black ${bucket.standby > 0 ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-200"}`}
+                        className={`flex items-center justify-center text-[9px] font-black ${bucket.standby > 0 ? "bg-amber-600 text-white" : "bg-transparent text-slate-800"}`}
                         title={`Standby: ${bucket.standby} min`}
                       >
                         {bucket.standby || ""}

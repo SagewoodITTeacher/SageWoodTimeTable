@@ -38,20 +38,20 @@ export function ConfirmDialog({
 
   const confirmClass =
     variant === "destructive"
-      ? "bg-curro-red hover:bg-red-700 text-white disabled:bg-red-300"
-      : "bg-curro-blue hover:bg-blue-800 text-white disabled:bg-blue-300";
+      ? "bg-rose-600 hover:bg-rose-500 text-white disabled:bg-rose-900/50 border border-rose-500/30"
+      : "bg-indigo-600 hover:bg-indigo-500 text-white disabled:bg-indigo-900/50 border border-indigo-500/30";
 
   return (
     <Modal open={open} onClose={onCancel} title={title} size="sm">
-      <div className="space-y-4">
-        <div className="text-sm text-text-dark">{message}</div>
+      <div className="space-y-6">
+        <div className="text-sm text-slate-100 leading-relaxed font-medium">{message}</div>
         {requiresType && (
-          <div className="space-y-1">
+          <div className="space-y-2">
             <label
               htmlFor="confirm-typed-input"
-              className="text-[11px] font-black uppercase tracking-widest text-text-muted"
+              className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500"
             >
-              Type "{requireTypedConfirmation}" to confirm
+              Verify identity: Type "{requireTypedConfirmation}"
             </label>
             <input
               id="confirm-typed-input"
@@ -59,15 +59,15 @@ export function ConfirmDialog({
               autoComplete="off"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm font-mono"
+              className="w-full rounded-xl bg-slate-950 border border-white/5 px-4 py-3 text-sm font-mono text-indigo-400 placeholder:text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all"
             />
           </div>
         )}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm font-bold text-text-dark hover:bg-gray-100"
+            className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/5 hover:text-white transition-all"
           >
             {cancelLabel}
           </button>
@@ -76,7 +76,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={!isConfirmEnabled}
             className={cn(
-              "px-4 py-2 rounded-xl text-sm font-bold transition-colors disabled:cursor-not-allowed",
+              "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg active:scale-95",
               confirmClass
             )}
           >

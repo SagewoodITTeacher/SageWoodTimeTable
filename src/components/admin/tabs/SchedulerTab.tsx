@@ -28,6 +28,7 @@ import {
   ClipboardCheck,
   RefreshCw,
   Settings,
+  LayoutDashboard,
   FlaskConical,
   Zap,
   Scale,
@@ -36,8 +37,12 @@ import {
   UserPlus,
   X,
   CheckCircle2,
+  Building2,
+  Calendar,
 } from "lucide-react";
 import { Modal, useToast } from "../../ui";
+import { SchedulerSettingsModal } from "../modals/SchedulerSettingsModal";
+import { SchedulerSettings, Subject } from "../../../types";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ResponsiveContainer,
@@ -71,6 +76,9 @@ import {
   isSHEHOverride,
   isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
   safeFirestoreWrite,
+  getTimetableCell,
+  hasGradeMarkerInPeriod,
+  isTeacherAllowedForGradeOnDate,
 } from "../shared/helpers";
 
 export function SchedulerTab({
@@ -118,10 +126,14 @@ export function SchedulerTab({
   getRelevantPeriodsIdx,
   hasIncompleteVenues,
   hasIncompleteVenuesForSelectedDate,
+  subjects,
+  settings,
+  onUpdateSettings,
 }: {
   teachers: Teacher[];
   entries: TimetableEntry[];
   venues: Venue[];
+  subjects: Subject[];
   dayPeriodConfigs: DayPeriodConfig[];
   conflictMap: { [tId: string]: { [date: string]: { [pIdx: number]: Set<string> } } };
   leaveRequests: LeaveRequest[];
@@ -163,7 +175,11 @@ export function SchedulerTab({
   getRelevantPeriodsIdx: (s: "MORNING" | "AFTERNOON", dur: number, e?: TimetableEntry) => number[];
   hasIncompleteVenues: boolean;
   hasIncompleteVenuesForSelectedDate: boolean;
+  settings: SchedulerSettings;
+  onUpdateSettings: (settings: SchedulerSettings) => Promise<void>;
 }) {
+  const [showSettings, setShowSettings] = useState(false);
+  const [isQuickSetup, setIsQuickSetup] = useState(false);
   const toast = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [isConfiguringPeriods, setIsConfiguringPeriods] = useState(false);
@@ -496,107 +512,110 @@ export function SchedulerTab({
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans pb-20">
-      <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-xl shadow-blue-900/5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-      <div>
-        <h3 className="text-2xl font-black text-text-dark uppercase tracking-tight flex items-center gap-3">
-          <div className="p-2 bg-curro-blue rounded-xl text-white shadow-lg shadow-blue-400/20">
-            <ClipboardCheck className="w-6 h-6" />
-          </div>
-          Invigilation Scheduler
-        </h3>
-        <div className="flex flex-col gap-1 mt-2">
-          <p className="text-xs font-bold text-text-muted uppercase tracking-widest">
-            Real-time Timetable synchronization • {dayName} • Cycle {cycle}
-          </p>
-          {isGenerating && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mt-2 space-y-2"
-            >
-              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
-                <span className="text-curro-blue flex items-center gap-2">
-                   <RefreshCw className="w-3 h-3 animate-spin" />
-                   Generating Assignments...
-                   <span className="text-text-muted ml-2">(Repacks: {repackCount})</span>
-                </span>
-                <span className="text-text-dark">{genProgress}% • {genElapsedTime}s</span>
+      <div className="bento-card p-10 border border-white/5 shadow-2xl relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.02] to-transparent pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-8 relative z-10">
+          <div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-4">
+              <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-500/20 border border-indigo-400/30">
+                <ClipboardCheck className="w-8 h-8" />
               </div>
-              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
+              <span>Invigilation Scheduler</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsQuickSetup(!isQuickSetup)}
+                  className={`p-2 transition-colors rounded-xl flex items-center gap-2 ${isQuickSetup ? 'bg-amber-500 text-white' : 'text-white/40 hover:text-white hover:bg-white/10'}`}
+                  title={isQuickSetup ? "Switch to Advanced Setup" : "Switch to Quick Setup"}
+                >
+                  <Zap className={`w-6 h-6 ${isQuickSetup ? 'fill-current' : ''}`} />
+                  {isQuickSetup && <span className="text-[10px] font-black uppercase tracking-widest px-1">Quick Setup Active</span>}
+                </button>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="p-2 text-white/40 hover:text-white transition-colors rounded-xl hover:bg-white/10"
+                  title="Configuration Settings"
+                >
+                  <Settings className="w-6 h-6" />
+                </button>
+              </div>
+            </h3>
+            <div className="flex flex-col gap-2 mt-4 ml-1">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                {dayName} • Cycle {cycle} • Registry Synchronized
+              </p>
+              {isGenerating && (
                 <motion.div
-                  className="h-full bg-curro-blue shadow-[0_0_10px_rgba(30,58,138,0.3)]"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${genProgress}%` }}
-                />
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-4 space-y-3 bg-white/[0.02] p-4 rounded-2xl border border-white/5"
+                >
+                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-[0.2em]">
+                    <span className="text-indigo-400 flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Assigning Slots...
+                      <span className="text-slate-500 ml-3">(Repacks: {repackCount})</span>
+                    </span>
+                    <span className="text-white">{genProgress}% • {genElapsedTime}s</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5 shadow-inner p-0.5">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.4)]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${genProgress}%` }}
+                    />
+                  </div>
+                </motion.div>
+              )}
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border border-emerald-500/20 shadow-sm">
+                  MORNING: START 08:20 (07:50)
+                </span>
+                <span className="bg-rose-500/10 text-rose-400 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border border-rose-500/20 shadow-sm">
+                  AFTERNOON: START 13:20 (12:50)
+                </span>
+                <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg border border-amber-500/20 shadow-sm">
+                  GRADE 12 HALL: 07:30 / 12:30
+                </span>
               </div>
-            </motion.div>
-          )}
-          <div className="flex gap-2 mt-1">
-            <span className="bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-emerald-100">
-              Morning: Start 08:20 (Staff 07:50)
-            </span>
-            <span className="bg-curro-red bg-opacity-5 text-curro-red text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-curro-red border-opacity-10">
-              Afternoon: Start 13:20 (Staff 12:50)
-            </span>
-            <span className="bg-amber-50 text-amber-600 text-[10px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-100">
-              Grade 12 Hall: Staff 07:30 / 12:30
-            </span>
+            </div>
           </div>
-        </div>
-      </div>
 
-          {/* Auto Generate Block */}
-          <div className="flex-1 max-w-xl bg-gray-50/80 rounded-3xl p-4 border border-gray-100 flex flex-col md:flex-row items-end gap-3 shadow-inner">
-            <div className="flex-1 flex flex-col gap-2">
-              <div className="w-full">
-                <label htmlFor="auto-from-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1 ml-1">
-                  Auto-generate FROM
+          <div className="flex-1 max-w-xl bg-[var(--color-bento-card)] rounded-[2.5rem] p-6 border border-white/5 flex flex-col md:flex-row items-stretch gap-4 shadow-2xl backdrop-blur-sm">
+            <div className="flex-1 flex flex-col gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block ml-1">
+                  Scope Start
                 </label>
                 <input
-                  id="auto-from-date"
                   type="date"
                   value={autoFromDate}
                   onChange={(e) => setAutoFromDate(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
+                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all"
                 />
               </div>
-              <div className="w-full">
-                <div className="flex items-center gap-2 mb-1 ml-1">
-                  <label htmlFor="auto-until-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest block">
-                    Auto-complete UNTIL
+              <div className="space-y-2">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block">
+                    Scope End
                   </label>
                   {hasIncompleteVenues && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] font-black text-curro-red bg-red-50 px-2 py-0.5 rounded-full animate-pulse border border-red-100">
-                        Venues missing
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20 animate-pulse">
+                        SESSIONS PENDING VENUE
                       </span>
-                      <button
-                        onClick={handleToggleVenueOverride}
-                        title="Override selected date"
-                        className="p-1 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
-                      >
-                        {dayPeriodConfigs.find((c) => c.id === selectedDate)
-                          ?.venuesOverridden ? (
-                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        ) : (
-                          <ShieldAlert className="w-3 h-3" />
-                        )}
-                      </button>
                     </div>
                   )}
                 </div>
                 <input
-                  id="auto-until-date"
                   type="date"
                   min={autoFromDate}
                   value={autoUntilDate}
                   onChange={(e) => setAutoUntilDate(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-curro-blue outline-none transition-all"
+                  className="w-full bg-slate-950 border border-white/5 rounded-xl px-4 py-3 text-sm font-bold text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/50 outline-none transition-all"
                 />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 min-w-[200px]">
               <button
                 onClick={async () => {
                   setIsGenerating(true);
@@ -618,10 +637,10 @@ export function SchedulerTab({
                   }
                 }}
                 disabled={isGenerating || entriesInRange.length === 0}
-                className="w-full md:w-auto bg-curro-blue/10 text-curro-blue border border-curro-blue/20 rounded-xl px-4 py-2.5 font-black text-[10px] uppercase tracking-widest shadow-sm hover:bg-curro-blue/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+                className="flex-1 bg-white/[0.02] text-slate-400 border border-white/5 rounded-xl px-4 py-2.5 font-black text-[9px] uppercase tracking-[0.2em] shadow-sm hover:bg-white/[0.05] hover:text-white disabled:opacity-20 transition-all flex items-center justify-center gap-2"
               >
-                <Zap className="w-3 h-3" />
-                Auto-Assign Venues (Range)
+                <Building2 className="w-3.5 h-3.5" />
+                Auto-Assign Venues
               </button>
               <button
                 onClick={handleAutoGenerate}
@@ -631,111 +650,66 @@ export function SchedulerTab({
                   hasIncompleteVenues ||
                   isBefore(parseISO(autoUntilDate), parseISO(autoFromDate))
                 }
-                className="w-full md:w-auto bg-text-dark text-white rounded-xl px-4 py-2.5 font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-black disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
+                className="flex-1 bg-indigo-600 text-white rounded-xl px-4 py-2.5 font-black text-[9px] uppercase tracking-[0.2em] shadow-lg hover:bg-indigo-500 disabled:opacity-20 transition-all active:scale-95 flex items-center justify-center gap-2 border border-indigo-400/30"
               >
                 {isGenerating ? (
-                  <RefreshCw className="w-3 h-3 animate-spin" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  <Zap className="w-3 h-3" />
+                  <Zap className="w-3.5 h-3.5" />
                 )}
-                {isGenerating ? "GENERATING..." : "Auto Generate"}
+                {isGenerating ? "GENERATING..." : "Auto Engine Run"}
               </button>
               <button
                 onClick={handleClearDay}
                 disabled={isGenerating || isEqualizing}
-                className="w-full md:w-auto bg-red-600 text-white py-2.5 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-red-600/20 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center gap-2"
-                title="Remove all assignments for this day"
+                className="flex-1 bg-rose-600/10 text-rose-400 py-2.5 px-4 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] border border-rose-500/20 hover:bg-rose-600 hover:text-white disabled:opacity-20 transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                Clear Day
+                Clear Selection
               </button>
             </div>
           </div>
 
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between mb-1.5 ml-1">
-              <label htmlFor="timetable-select-date" className="text-[10px] font-black text-text-muted uppercase tracking-widest">
-                Select Date
+          <div className="flex flex-col min-w-[280px]">
+            <div className="flex items-center justify-between mb-2 ml-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                Target Date
               </label>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleEqualize}
-                  disabled={isGenerating || isEqualizing}
-                  className="bg-emerald-600 text-white rounded-xl px-3 py-1 font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-1.5"
-                >
-                  <Scale className="w-2.5 h-2.5" />
-                  Equalize
-                </button>
-                <button
-                  onClick={() => handleEqualize(true)}
-                  disabled={isGenerating || isEqualizing}
-                  className="bg-curro-blue text-white rounded-xl px-3 py-1 font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-black transition-all active:scale-95 flex items-center gap-1.5"
-                >
-                  <Wand2 className="w-2.5 h-2.5" />
-                  Fix errors & Balance
-                </button>
-                <button
-                  onClick={() => setIsConfiguringPeriods(true)}
-                  className="text-[10px] font-black text-curro-blue uppercase tracking-widest hover:underline flex items-center gap-1"
-                >
-                  <Settings className="w-2.5 h-2.5" />
-                  Configure Periods
-                </button>
-              </div>
+              <button
+                onClick={() => setIsConfiguringPeriods(true)}
+                className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:text-white flex items-center gap-1.5 transition-colors"
+              >
+                <Settings className="w-3 h-3" />
+                Config
+              </button>
             </div>
-            <input
-              id="timetable-select-date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-gray-50 border-2 border-transparent focus:border-curro-blue focus:bg-white rounded-2xl px-6 py-3.5 text-sm font-bold transition-all outline-none shadow-sm"
-            />
-            {dayEntries.length > 0 && (
-              <div className="mt-2 ml-1 flex items-center gap-3">
-                {hasIncompleteVenuesForSelectedDate ? (
-                  <span className="text-[10px] font-black text-curro-red uppercase tracking-widest flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-curro-red animate-pulse" />
-                    Venues Missing
-                  </span>
-                ) : (
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {dayPeriodConfigs.find((c) => c.id === selectedDate)
-                      ?.venuesOverridden
-                      ? "Venues Overridden"
-                      : "Venues selected."}
-                  </span>
-                )}
-                <button
-                  onClick={handleToggleVenueOverride}
-                  className={`p-1.5 rounded-lg transition-all flex items-center gap-1.5 border-2 ${
-                    dayPeriodConfigs.find((c) => c.id === selectedDate)
-                      ?.venuesOverridden
-                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-white text-gray-400 border-gray-100 hover:border-blue-200 hover:text-blue-600"
-                  }`}
-                  title={
-                    dayPeriodConfigs.find((c) => c.id === selectedDate)
-                      ?.venuesOverridden
-                      ? "Remove Override"
-                      : "Override Venue Check"
-                  }
-                >
-                  {dayPeriodConfigs.find((c) => c.id === selectedDate)
-                    ?.venuesOverridden ? (
-                    <ShieldCheck className="w-3 h-3" />
-                  ) : (
-                    <ShieldAlert className="w-3 h-3" />
-                  )}
-                  <span className="text-[10px] font-black uppercase whitespace-nowrap">
-                    {dayPeriodConfigs.find((c) => c.id === selectedDate)
-                      ?.venuesOverridden
-                      ? "Overridden"
-                      : "Override"}
-                  </span>
-                </button>
-              </div>
-            )}
+            <div className="relative group">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-slate-950 border border-white/5 group-hover:border-indigo-500/30 rounded-2xl px-6 py-4 text-sm font-bold text-white transition-all outline-none shadow-2xl w-full"
+              />
+              <div className="absolute inset-0 rounded-2xl ring-2 ring-indigo-500/0 group-hover:ring-indigo-500/10 transition-all pointer-events-none" />
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                onClick={handleEqualize}
+                disabled={isGenerating || isEqualizing}
+                className="bg-emerald-500/10 text-emerald-400 rounded-xl px-4 py-1.5 font-black text-[9px] uppercase tracking-widest border border-emerald-500/20 shadow-sm hover:bg-emerald-500/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Scale className="w-3 h-3" />
+                Balance
+              </button>
+              <button
+                onClick={() => handleEqualize(true)}
+                disabled={isGenerating || isEqualizing}
+                className="bg-indigo-500/10 text-indigo-400 rounded-xl px-4 py-1.5 font-black text-[9px] uppercase tracking-widest border border-indigo-500/20 shadow-sm hover:bg-indigo-500/20 transition-all active:scale-95 flex items-center gap-2"
+              >
+                <Wand2 className="w-3 h-3" />
+                Fix Conflicts
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -843,20 +817,28 @@ export function SchedulerTab({
 
             const isWednesdayFirstPeriod = isWednesday(parseISO(selectedDate)) && relevantPIdxs.includes(0);
 
-            // Filter out Merike van Dyk entirely
+            // Filter out Excluded and apply Grade/Date restrictions
             const eligibleTeachersWithStatus = teachersWithStatus.filter(ts => {
-              return !isExcludedFromInvigilation(ts.teacher);
+              if (isExcludedFromInvigilation(ts.teacher)) return false;
+              
+              // Custom Date Range filter based on grade
+              if (!isTeacherAllowedForGradeOnDate(ts.teacher, entry.grade, selectedDate, settings)) {
+                return false;
+              }
+              
+              return true;
             });
 
             const filteredTeachersWithStatus = eligibleTeachersWithStatus.filter(ts => {
               const isRestrictedByG12Day = entry.grade === 12 && grade12SubjectsToday.some(sub => isTeacherRestricted(ts.teacher, sub));
               if (isRestrictedByG12Day && !(ts.isEntrySpecialist && isPrac)) {return false;}
 
-              if (isWednesdayFirstPeriod && !ts.isEntrySpecialist) {
-                if (ts.teacher.homeRoomGrade) {
-                  return ts.teacher.homeRoomGrade === entry.grade;
+              if (isWednesdayFirstPeriod && settings.wednesdayHomeroomInvigilation && !ts.isEntrySpecialist) {
+                const hasMarker = hasGradeMarkerInPeriod(ts.teacher, entry.grade, 0, selectedDate);
+                if (ts.teacher.homeRoomGrade === entry.grade || hasMarker) {
+                  return true;
                 }
-                return true;
+                return false;
               }
               return true;
             });
@@ -925,10 +907,10 @@ export function SchedulerTab({
             return (
               <div
                 key={entry.id}
-                className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-white/50 p-1 rounded-[40px] border border-white/50 backdrop-blur-sm"
+                className={`grid grid-cols-1 ${isQuickSetup ? 'lg:grid-cols-7' : 'lg:grid-cols-12'} gap-6 bg-white/50 p-1 rounded-[40px] border border-white/50 backdrop-blur-sm items-stretch`}
               >
                 {/* Exam Details */}
-                <div className="lg:col-span-3 bg-white rounded-[32px] p-6 shadow-xl shadow-blue-900/5 border border-white flex flex-col items-center text-center">
+                <div className={`${isQuickSetup ? 'lg:col-span-3' : 'lg:col-span-3'} bg-white rounded-[32px] p-6 shadow-xl shadow-blue-900/5 border border-white flex flex-col items-center text-center self-start sticky top-6`}>
                   <div
                     className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-5 rotate-3 ${entry.session === "MORNING" ? "bg-amber-50 text-amber-600" : "bg-curro-red bg-opacity-10 text-curro-red"}`}
                   >
@@ -1069,7 +1051,24 @@ export function SchedulerTab({
                         })}
                       </div>
                     </div>
+                  </div>
+                </div>
 
+                {/* Period Allocation Slots */}
+                <div className={`${isQuickSetup ? 'lg:col-span-4' : 'lg:col-span-4'} bg-white rounded-[32px] p-6 shadow-xl shadow-blue-900/5 border border-white flex flex-col h-[calc(100vh-250px)] min-h-[650px] sticky top-6 self-start`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <h5 className="text-[11px] font-black text-curro-blue uppercase tracking-widest flex items-center gap-2">
+                      <LayoutDashboard className="w-4 h-4" />
+                      Session Slots
+                    </h5>
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-bold text-curro-blue bg-blue-50 px-2 py-0.5 rounded-full uppercase">
+                        {entry.session}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar min-h-0">
                     <div className="pt-4 border-t border-gray-50 flex flex-col gap-3">
                       {isPrac && (
                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-purple-600 bg-purple-50 px-2 py-1.5 rounded-xl">
@@ -1092,7 +1091,7 @@ export function SchedulerTab({
                                   </span>
                                   <div className="h-px flex-1 bg-gray-100" />
                                 </div>
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                                <div className={`grid ${isQuickSetup ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'} gap-2`}>
                                   {/* Stand-By Slot */}
                                   {(() => {
                                     const role = "STANDBY";
@@ -1133,6 +1132,7 @@ export function SchedulerTab({
                                       <div
                                         key={key}
                                         onDragOver={(e) => {
+                                          if (isQuickSetup) return;
                                           e.preventDefault();
                                           e.currentTarget.classList.add(
                                             "bg-purple-50",
@@ -1140,12 +1140,14 @@ export function SchedulerTab({
                                           );
                                         }}
                                         onDragLeave={(e) => {
+                                          if (isQuickSetup) return;
                                           e.currentTarget.classList.remove(
                                             "bg-purple-50",
                                             "border-purple-400",
                                           );
                                         }}
                                         onDrop={(e) => {
+                                          if (isQuickSetup) return;
                                           e.preventDefault();
                                           e.currentTarget.classList.remove(
                                             "bg-purple-50",
@@ -1165,32 +1167,65 @@ export function SchedulerTab({
                                         }}
                                         className={`group relative p-2 rounded-xl border-2 border-dashed transition-all min-h-[60px] flex flex-col items-center justify-center text-center ${statusColors[status]}`}
                                       >
-                                        <div className="flex flex-col items-center gap-0.5">
+                                        <div className="flex flex-col items-center gap-0.5 w-full">
                                           <div className="flex items-center gap-1">
                                             <Shield className="w-2.5 h-2.5 opacity-40 text-purple-600" />
                                             <span className="text-[7px] font-black uppercase tracking-widest text-purple-600 bg-purple-50 px-1 rounded-sm">
                                               STAND-BY
                                             </span>
                                           </div>
-                                          {teacher ? (
-                                            <>
-                                              <span className="text-[10px] font-black leading-tight">
-                                                {teacher.lastName}
-                                              </span>
-                                              <button
-                                                onClick={() =>
-                                                  removeAssignment(entry, key)
+
+                                          {isQuickSetup ? (
+                                            <select
+                                              className="w-full mt-1 bg-white border border-purple-100 rounded-lg text-[10px] font-black text-center focus:outline-none focus:border-purple-400 cursor-pointer p-1"
+                                              value={assignedId || ""}
+                                              onChange={(e) => {
+                                                const tId = e.target.value;
+                                                if (tId) {
+                                                  handleAssignInvigilator(pIdx, tId, entry, venueId, role, index);
+                                                } else if (assignedId) {
+                                                  removeAssignment(entry, key);
                                                 }
-                                                className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-curro-red text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white hover:scale-110 active:scale-95 transition-all z-20"
-                                                title="Remove Standby"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                              </button>
-                                            </>
+                                              }}
+                                            >
+                                              <option value="">{assignedId ? "Change..." : "Select..."}</option>
+                                              <optgroup label="Available (Green)">
+                                                {idealTeachers.filter(ts => !ts.isUsed && !ts.isBusyInPeriod(pIdx)).map(ts => (
+                                                  <option key={ts.teacher.id} value={ts.teacher.id} className="text-emerald-600 font-bold">
+                                                    {ts.teacher.firstName} {ts.teacher.lastName}
+                                                  </option>
+                                                ))}
+                                              </optgroup>
+                                              <optgroup label="Free (Blue)">
+                                                {reserveTeachers.filter(ts => !ts.isUsed && !ts.isBusyInPeriod(pIdx)).map(ts => (
+                                                  <option key={ts.teacher.id} value={ts.teacher.id} className="text-sky-600 font-bold">
+                                                    {ts.teacher.firstName} {ts.teacher.lastName}
+                                                  </option>
+                                                ))}
+                                              </optgroup>
+                                              {assignedId && <option value="">[ Remove ]</option>}
+                                            </select>
                                           ) : (
-                                            <span className="text-[10px] font-bold opacity-30 italic">
-                                              Unassigned
-                                            </span>
+                                            teacher ? (
+                                              <>
+                                                <span className="text-[10px] font-black leading-tight">
+                                                  {teacher.lastName}
+                                                </span>
+                                                <button
+                                                  onClick={() =>
+                                                    removeAssignment(entry, key)
+                                                  }
+                                                  className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-curro-red text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white hover:scale-110 active:scale-95 transition-all z-20"
+                                                  title="Remove Standby"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <span className="text-[10px] font-bold opacity-30 italic">
+                                                Unassigned
+                                              </span>
+                                            )
                                           )}
                                         </div>
                                       </div>
@@ -1291,6 +1326,7 @@ export function SchedulerTab({
                                           <div
                                             key={key}
                                             onDragOver={(e) => {
+                                              if (isQuickSetup) return;
                                               e.preventDefault();
                                               e.currentTarget.classList.add(
                                                 "bg-blue-50",
@@ -1298,12 +1334,14 @@ export function SchedulerTab({
                                               );
                                             }}
                                             onDragLeave={(e) => {
+                                              if (isQuickSetup) return;
                                               e.currentTarget.classList.remove(
                                                 "bg-blue-50",
                                                 "border-curro-blue",
                                               );
                                             }}
                                             onDrop={(e) => {
+                                              if (isQuickSetup) return;
                                               e.preventDefault();
                                               e.currentTarget.classList.remove(
                                                 "bg-blue-50",
@@ -1325,7 +1363,7 @@ export function SchedulerTab({
                                             }}
                                             className={`group relative p-2 rounded-xl border-2 border-dashed transition-all min-h-[60px] flex flex-col items-center justify-center text-center ${statusColors[status]}`}
                                           >
-                                            <div className="flex flex-col items-center gap-0.5">
+                                            <div className="flex flex-col items-center gap-0.5 w-full">
                                               <div className="flex items-center gap-1">
                                                 <span className="text-[7px] font-black uppercase tracking-widest opacity-40">
                                                   {venue.name}
@@ -1334,28 +1372,70 @@ export function SchedulerTab({
                                                   {label}
                                                 </span>
                                               </div>
-                                              {teacher ? (
-                                                <>
-                                                  <span className="text-[10px] font-black leading-tight">
-                                                    {teacher.lastName}
-                                                  </span>
-                                                <button
-                                                    onClick={() =>
-                                                      removeAssignment(
-                                                        entry,
-                                                        key,
-                                                      )
+
+                                              {isQuickSetup ? (
+                                                <select
+                                                  className="w-full mt-1 bg-white border border-blue-100 rounded-lg text-[10px] font-black text-center focus:outline-none focus:border-blue-400 cursor-pointer p-1"
+                                                  value={assignedId || ""}
+                                                  onChange={(e) => {
+                                                    const tId = e.target.value;
+                                                    if (tId) {
+                                                      handleAssignInvigilator(pIdx, tId, entry, venue.id, type, index);
+                                                    } else if (assignedId) {
+                                                      removeAssignment(entry, key);
                                                     }
-                                                    className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-curro-red text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white hover:scale-110 active:scale-95 transition-all z-20"
-                                                    title="Remove Assignment"
-                                                  >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                  </button>
-                                                </>
+                                                  }}
+                                                >
+                                                  <option value="">{assignedId ? "Change..." : "Select..."}</option>
+                                                  {type === "TECH" && (
+                                                    <optgroup label="Technical Staff">
+                                                      {techTeachers.filter(ts => !ts.isUsedTech && !ts.isBusyInPeriod(pIdx, "TECH")).map(ts => (
+                                                        <option key={ts.teacher.id} value={ts.teacher.id} className="text-purple-600 font-bold">
+                                                          {ts.teacher.firstName} {ts.teacher.lastName}
+                                                        </option>
+                                                      ))}
+                                                    </optgroup>
+                                                  )}
+                                                  <optgroup label="Available (Green)">
+                                                    {idealTeachers.filter(ts => !ts.isUsed && !ts.isBusyInPeriod(pIdx)).map(ts => (
+                                                      <option key={ts.teacher.id} value={ts.teacher.id} className="text-emerald-600 font-bold">
+                                                        {ts.teacher.firstName} {ts.teacher.lastName}
+                                                      </option>
+                                                    ))}
+                                                  </optgroup>
+                                                  <optgroup label="Free (Blue)">
+                                                    {reserveTeachers.filter(ts => !ts.isUsed && !ts.isBusyInPeriod(pIdx)).map(ts => (
+                                                      <option key={ts.teacher.id} value={ts.teacher.id} className="text-sky-600 font-bold">
+                                                        {ts.teacher.firstName} {ts.teacher.lastName}
+                                                      </option>
+                                                    ))}
+                                                  </optgroup>
+                                                  {assignedId && <option value="">[ Remove ]</option>}
+                                                </select>
                                               ) : (
-                                                <span className="text-[10px] font-bold opacity-30 italic">
-                                                  Unassigned
-                                                </span>
+                                                teacher ? (
+                                                  <>
+                                                    <span className="text-[10px] font-black leading-tight">
+                                                      {teacher.lastName}
+                                                    </span>
+                                                  <button
+                                                      onClick={() =>
+                                                        removeAssignment(
+                                                          entry,
+                                                          key,
+                                                        )
+                                                      }
+                                                      className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-curro-red text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white hover:scale-110 active:scale-95 transition-all z-20"
+                                                      title="Remove Assignment"
+                                                    >
+                                                      <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                  </>
+                                                ) : (
+                                                  <span className="text-[10px] font-bold opacity-30 italic">
+                                                    Unassigned
+                                                  </span>
+                                                )
                                               )}
                                             </div>
                                           </div>
@@ -1373,18 +1453,18 @@ export function SchedulerTab({
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 bg-white rounded-[32px] p-6 shadow-xl shadow-blue-900/5 border border-white overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-6">
-                      <h5 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        Invigilation Staff
-                      </h5>
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">
-                        Scheduled to Grade
-                      </span>
-                    </div>
+                <div className="lg:col-span-5 bg-white rounded-[32px] p-6 shadow-xl shadow-blue-900/5 border border-white overflow-hidden flex flex-col h-[calc(100vh-250px)] min-h-[650px] sticky top-6 self-start">
+                      <div className="flex items-center justify-between mb-6">
+                        <h5 className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          Invigilation Staff
+                        </h5>
+                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase">
+                          Scheduled to Grade
+                        </span>
+                      </div>
 
-                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar h-[650px] max-h-[80vh]">
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar min-h-0">
                       {/* Priority: Technical Staff for Prac */}
                       {isPrac && techTeachers.length > 0 && (
                         <div className="space-y-2 mb-6">
@@ -1464,6 +1544,41 @@ export function SchedulerTab({
                                       {isAssigned ? "Assigned" : isUsed ? "Occupied" : isSpecialist ? "Technical Specialist" : "Subject Specialist"}
                                     </span>
                                     <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} />
+                                    {(() => {
+                                      return activePeriods.map((p, idx) => {
+                                        const cell = getTimetableCell(t, idx, selectedDate);
+                                        const isBusyInPeriod = ts.isBusyInPeriod(idx, "TECH");
+                                        const isAssignedToThisEntry = Object.keys(entry.invigilatorAssignments || {}).some(k => k.startsWith(`${idx}_`) && entry.invigilatorAssignments?.[k] === t.id);
+                                        
+                                        let statusColor = "bg-emerald-500";
+                                        let label = `P${idx + 1}`;
+                                        let titleText = "Available";
+                                        
+                                        if (cell) {
+                                          statusColor = "bg-rose-500";
+                                          label = `T${idx + 1}`;
+                                          titleText = `Teaching: ${cell}`;
+                                        } else if (isAssignedToThisEntry) {
+                                          statusColor = "bg-curro-blue";
+                                          label = `A${idx + 1}`;
+                                          titleText = "Assigned here";
+                                        } else if (isBusyInPeriod) {
+                                          statusColor = "bg-amber-500";
+                                          label = `U${idx + 1}`;
+                                          titleText = "Used elsewhere";
+                                        }
+
+                                        return (
+                                          <span 
+                                            key={idx} 
+                                            className={`text-[7px] font-black px-1 rounded uppercase text-white ${statusColor}`}
+                                            title={titleText}
+                                          >
+                                            {label}
+                                          </span>
+                                        );
+                                      });
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -1552,6 +1667,42 @@ export function SchedulerTab({
                                         CONFLICT!
                                       </span>
                                     )}
+                                    {(() => {
+                                      return activePeriods.map((p, idx) => {
+                                        const cell = getTimetableCell(t, idx, selectedDate);
+                                        const teacherAssignments = occupiedTeachersMap[t.id] || [];
+                                        const isBusyInSlot = teacherAssignments.includes(idx);
+                                        const isAssignedToThisEntry = Object.keys(entry.invigilatorAssignments || {}).some(k => k.startsWith(`${idx}_`) && entry.invigilatorAssignments?.[k] === t.id);
+                                        
+                                        let statusColor = "bg-emerald-500";
+                                        let label = `P${idx + 1}`;
+                                        let titleText = "Available";
+                                        
+                                        if (cell) {
+                                          statusColor = "bg-rose-500";
+                                          label = `T${idx + 1}`;
+                                          titleText = `Teaching: ${cell}`;
+                                        } else if (isAssignedToThisEntry) {
+                                          statusColor = "bg-curro-blue";
+                                          label = `A${idx + 1}`;
+                                          titleText = "Assigned here";
+                                        } else if (isBusyInSlot) {
+                                          statusColor = "bg-amber-500";
+                                          label = `U${idx + 1}`;
+                                          titleText = "Used elsewhere";
+                                        }
+
+                                        return (
+                                          <span 
+                                            key={idx} 
+                                            className={`text-[7px] font-black px-1 rounded uppercase text-white ${statusColor}`}
+                                            title={titleText}
+                                          >
+                                            {label}
+                                          </span>
+                                        );
+                                      });
+                                    })()}
                                     <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} isUsed={isUsed} />
                                     {t.homeRoomGrade && (
                                       <span className={`text-[7px] font-black px-1 rounded uppercase ${isAssigned || hasConflict ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700"}`}>
@@ -1584,19 +1735,18 @@ export function SchedulerTab({
                   </div>
                 </div>
 
-                {/* Reserve Selection */}
-                <div className="lg:col-span-4 bg-gray-50/50 rounded-[32px] p-6 border border-white border-dashed flex flex-col overflow-hidden">
-                  <div className="flex items-center justify-between mb-6">
-                    <h5 className="text-[11px] font-black text-curro-red uppercase tracking-widest flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      Reserve Selection
-                    </h5>
+                <div className="lg:col-span-4 bg-gray-50/50 rounded-[32px] p-6 border border-white border-dashed flex flex-col overflow-hidden h-[calc(100vh-250px)] min-h-[650px]">
+                    <div className="flex items-center justify-between mb-6">
+                      <h5 className="text-[11px] font-black text-curro-red uppercase tracking-widest flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Reserve Selection
+                      </h5>
                     <span className="text-[10px] font-bold text-curro-red bg-red-50 px-2 py-0.5 rounded-full">
                       FREE PERIODS
                     </span>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar h-[650px] max-h-[80vh]">
+                  <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar min-h-0">
                     {reserveTeachers.length === 0 ? (
                       <p className="text-xs text-text-muted italic opacity-50 py-10 text-center">
                         No reserve teachers found...
@@ -1623,7 +1773,7 @@ export function SchedulerTab({
                                 e.dataTransfer.setData("teacherId", t.id)
                               }
                               onClick={() => {
-                                if (isBlocked) {return;}
+                                if (isBlocked) return;
                                 handleToggleAssignment(entry, t.id);
                               }}
                               className={`flex items-center justify-between p-4 rounded-2xl border transition-all group overflow-hidden ${
@@ -1637,46 +1787,83 @@ export function SchedulerTab({
                               }`}
                             >
                               <div className="flex flex-col gap-1.5 overflow-hidden">
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-[10px] font-bold truncate ${isAssigned || hasConflict ? "text-white" : "text-text-dark"}`}>
-                                    {t.firstName} {t.lastName}
-                                    {t.invigilationPreference === "MARATHON" && (
-                                      <span className="ml-1 inline-flex items-center justify-center w-3.5 h-3.5 bg-orange-100 text-orange-700 rounded-full text-[7px] font-black" title="Marathon Teacher">M</span>
-                                    )}
-                                    {t.invigilationPreference === "SCATTERED" && (
-                                      <span className="ml-1 inline-flex items-center justify-center w-3.5 h-3.5 bg-sky-100 text-sky-700 rounded-full text-[7px] font-black" title="Scattered Teacher">S</span>
-                                    )}
-                                  </span>
-                                  {isAssigned && (
-                                    <span className="text-[7px] font-black bg-white text-curro-blue px-1 rounded uppercase">
-                                      Assigned
+                                  <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+                                    <span className={`text-[10px] font-bold truncate ${isAssigned || hasConflict ? "text-white" : "text-text-dark"}`}>
+                                      {t.firstName} {t.lastName}
+                                      {t.invigilationPreference === "MARATHON" && (
+                                        <span className="ml-1 inline-flex items-center justify-center w-3.5 h-3.5 bg-orange-100 text-orange-700 rounded-full text-[7px] font-black" title="Marathon Teacher">M</span>
+                                      )}
+                                      {t.invigilationPreference === "SCATTERED" && (
+                                        <span className="ml-1 inline-flex items-center justify-center w-3.5 h-3.5 bg-sky-100 text-sky-700 rounded-full text-[7px] font-black" title="Scattered Teacher">S</span>
+                                      )}
                                     </span>
-                                  )}
-                                  {hasConflict && (
-                                    <span className="text-[7px] font-black bg-white text-curro-red px-1 rounded uppercase animate-pulse">
-                                      CONFLICT!
-                                    </span>
-                                  )}
-                                  <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} isUsed={isUsed} />
+                                    {isAssigned && (
+                                      <span className="text-[7px] font-black bg-white text-curro-blue px-1 rounded uppercase">
+                                        Assigned
+                                      </span>
+                                    )}
+                                    {hasConflict && (
+                                      <span className="text-[7px] font-black bg-white text-curro-red px-1 rounded uppercase animate-pulse">
+                                        CONFLICT!
+                                      </span>
+                                    )}
+                                    {(() => {
+                                      return activePeriods.map((p, idx) => {
+                                        const cell = getTimetableCell(t, idx, selectedDate);
+                                        const isBusyInSlot = ts.isBusyInPeriod?.(idx);
+                                        const isAssignedToThisEntry = Object.keys(entry.invigilatorAssignments || {}).some(k => k.startsWith(`${idx}_`) && entry.invigilatorAssignments?.[k] === t.id);
+                                        
+                                        let statusColor = "bg-emerald-500";
+                                        let label = `P${idx + 1}`;
+                                        let titleText = "Available";
+                                        
+                                        if (cell) {
+                                          statusColor = "bg-rose-500";
+                                          label = `T${idx + 1}`;
+                                          titleText = `Teaching: ${cell}`;
+                                        } else if (isAssignedToThisEntry) {
+                                          statusColor = "bg-curro-blue";
+                                          label = `A${idx + 1}`;
+                                          titleText = "Assigned here";
+                                        } else if (isBusyInSlot) {
+                                          statusColor = "bg-amber-500";
+                                          label = `U${idx + 1}`;
+                                          titleText = "Used elsewhere";
+                                        }
+
+                                        return (
+                                          <span 
+                                            key={idx} 
+                                            className={`text-[7px] font-black px-1 rounded uppercase text-white ${statusColor}`}
+                                            title={titleText}
+                                          >
+                                            {label}
+                                          </span>
+                                        );
+                                      });
+                                    })()}
+                                    <TeacherStatusBadges isBlockedByBreak={isBlockedByBreak} isBlockedByAfternoon={isBlockedByAfternoon} isUsed={isUsed} />
+                                  </div>
                                   {t.homeRoomGrade && (
-                                    <span className={`text-[7px] font-black px-1 rounded uppercase ${isAssigned || hasConflict ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700"}`}>
-                                      HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
-                                    </span>
+                                    <div className="mt-1">
+                                      <span className={`text-[7px] font-black px-1 rounded uppercase ${isAssigned || hasConflict ? "bg-white/20 text-white" : "bg-indigo-100 text-indigo-700"}`}>
+                                        HR Gr {t.homeRoomGrade} E{t.homeRoomClass}
+                                      </span>
+                                    </div>
                                   )}
                                   <span className={`text-[10px] font-black ${isAssigned || hasConflict ? "text-white/60" : "text-text-muted opacity-50"}`}>
                                     {t.id}
                                   </span>
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {freeFor.map((pIdx) => (
-                                    <span
-                                      key={pIdx}
-                                      className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-red-100 text-red-600"}`}
-                                    >
-                                      {activePeriods[pIdx]?.label}
-                                    </span>
-                                  ))}
-                                </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {freeFor.map((pIdx) => (
+                                      <span
+                                        key={pIdx}
+                                        className={`text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest ${isAssigned ? "bg-white/20 text-white" : isBusyInPeriod(pIdx) ? "bg-gray-200 text-gray-500" : "bg-red-100 text-red-600"}`}
+                                      >
+                                        {activePeriods[pIdx]?.label}
+                                      </span>
+                                    ))}
+                                  </div>
                               </div>
                               {!isUsed && (
                                 <div className={`${isAssigned ? "bg-white/20" : "bg-curro-red"} text-white p-2 rounded-lg ${isAssigned ? "" : "opacity-20 group-hover:opacity-100"} transition-all shadow-lg active:scale-95`}>
@@ -1691,7 +1878,7 @@ export function SchedulerTab({
                   </div>
                 </div>
               </div>
-            );
+            )
           })}
         </div>
       )}
@@ -1716,104 +1903,22 @@ export function SchedulerTab({
         title="Equalizing Workload"
         size="md"
         hideClose
-        dismissOnBackdrop={false}
-        dismissOnEscape={false}
       >
-            <div className="text-center relative overflow-hidden">
-              <div className="absolute -top-6 -left-6 -right-6 h-2 bg-gray-100/50">
-                <motion.div
-                  className="h-full bg-emerald-500"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${eqProgress}%` }}
-                />
-              </div>
-
-              <div className="mb-8 relative inline-block">
-                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center">
-                  <Scale className="w-12 h-12 text-emerald-600" />
-                </div>
-                <div className="absolute -bottom-2 -right-2 bg-white p-2 rounded-2xl shadow-lg border border-emerald-100">
-                  <div className="w-8 h-8 bg-emerald-600 text-white rounded-xl flex items-center justify-center">
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="my-6 h-32 w-full bg-gray-50 rounded-2xl p-2 border border-blue-100/30">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={interactiveWorkload}>
-                    <Bar dataKey="tech" stackId="a" fill="#0ea5e9" isAnimationActive={false} />
-                    <Bar dataKey="morning" stackId="a" fill="#3b82f6" isAnimationActive={false} />
-                    <Bar dataKey="afternoon" stackId="a" fill="#a855f7" isAnimationActive={false} />
-                    <Bar dataKey="standby" stackId="a" fill="#10b981" isAnimationActive={false} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
-                  <span className="text-[10px] font-black text-text-muted uppercase tracking-widest block mb-1">
-                    Swaps
-                  </span>
-                  <span className="text-xl font-black text-curro-blue">
-                    {eqSwaps}
-                  </span>
-                </div>
-                <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 text-center">
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">
-                    Conflicts
-                  </span>
-                  <span className="text-xl font-black text-emerald-600">
-                    {eqResolvedConflicts}
-                  </span>
-                </div>
-              </div>
-
-              {/* Multi-Stage Progress Bars */}
-              <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100/50 mb-8">
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                  {eqStages.map((stage) => (
-                    <div key={stage.id} className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">
-                          {stage.label}
-                        </span>
-                        <span className="text-[10px] font-black text-curro-blue">
-                          {stage.progress}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${stage.progress}%` }}
-                          className={`h-full ${stage.progress === 100 ? "bg-emerald-500" : "bg-blue-500"}`}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-1">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${eqProgress}%` }}
-                  />
-                </div>
-                <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest px-1">
-                  <span className="text-emerald-600">{eqProgress < 100 ? "Processing..." : "Complete"}</span>
-                  <span className="text-text-muted">{eqProgress}%</span>
-                </div>
-              </div>
-
-              <p className="mt-8 text-[10px] font-bold text-text-muted opacity-50 uppercase tracking-widest">
-                Please do not close or refresh this tab
-              </p>
-            </div>
+        <div className="p-8 text-center">
+          <RefreshCw className="w-12 h-12 text-emerald-600 animate-spin mx-auto mb-4" />
+          <p className="text-sm font-bold text-text-dark">Processing swaps... {eqProgress}%</p>
+        </div>
       </Modal>
       <ConfirmFromState state={confirmState} onClose={() => setConfirmState(null)} />
+      
+      <SchedulerSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={settings}
+        teachers={teachers}
+        subjects={subjects}
+        onSave={onUpdateSettings}
+      />
     </div>
   );
 }

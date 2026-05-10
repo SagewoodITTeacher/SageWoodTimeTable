@@ -5,6 +5,7 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 export interface UseCollectionResult<T> {
   data: T[];
   loading: boolean;
+  error: Error | null;
 }
 
 export function useFirestoreCollection<T extends { id?: string }>(
@@ -12,8 +13,11 @@ export function useFirestoreCollection<T extends { id?: string }>(
 ): UseCollectionResult<T> {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    setError(null);
+    setLoading(true);
     const unsub = onSnapshot(
       collection(db, name),
       (snap) => {
@@ -23,13 +27,15 @@ export function useFirestoreCollection<T extends { id?: string }>(
         setData(docs);
         setLoading(false);
       },
-      (error) => {
+      (err) => {
         setLoading(false);
-        handleFirestoreError(error, OperationType.LIST, name);
+        setError(err instanceof Error ? err : new Error(String(err)));
+        // We log it but don't re-throw here to avoid crashing the component
+        console.error(`Firestore listener error on ${name}:`, err);
       },
     );
     return () => unsub();
   }, [name]);
 
-  return { data, loading };
+  return { data, loading, error };
 }

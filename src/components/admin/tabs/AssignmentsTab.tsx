@@ -70,19 +70,20 @@ export function AssignmentsTab({
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {leaveRequests.some((r) => r.status === "PENDING") && (
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="px-5 py-4 border-b border-amber-200 bg-amber-100/50 flex items-center justify-between">
-            <h3 className="font-black text-amber-900 uppercase tracking-tight text-xs flex items-center gap-2">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Pending Leave Approvals (
+        <div className="bg-amber-500/10 border-2 border-amber-500/20 rounded-2xl overflow-hidden shadow-2xl animate-in fade-in slide-in-from-top-4 duration-500 relative">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 to-orange-500"></div>
+          <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+            <h3 className="font-bold text-amber-500 uppercase tracking-[0.2em] text-[10px] flex items-center gap-3">
+              <AlertCircle className="w-4 h-4" />
+              Critical Leave Requisitions (
               {leaveRequests.filter((r) => r.status === "PENDING").length}
               )
             </h3>
-            <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest bg-amber-200/50 px-2 py-0.5 rounded-full">
-              Requires Action
+            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+              Action Required
             </span>
           </div>
-          <div className="divide-y divide-amber-100">
+          <div className="divide-y divide-white/5">
             {leaveRequests
               .filter((r) => r.status === "PENDING")
               .sort((a, b) => a.date.localeCompare(b.date))
@@ -93,32 +94,32 @@ export function AssignmentsTab({
                 return (
                   <div
                     key={req.id}
-                    className="p-4 flex items-center justify-between hover:bg-amber-100/30 transition-colors"
+                    className="p-5 flex items-center justify-between hover:bg-white/[0.03] transition-all"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-200 text-amber-700 flex items-center justify-center font-black text-xs">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-black text-sm shadow-inner">
                         {teacher?.lastName[0] || "?"}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-amber-900">
+                        <span className="text-sm font-bold text-slate-100">
                           {teacher?.firstName} {teacher?.lastName}
                         </span>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] font-black text-amber-700/60 uppercase tracking-tighter">
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
                             {format(parseISO(req.date), "EEE, d MMM")}
                           </span>
-                          <span className="text-[10px] font-bold text-amber-600 bg-amber-200/40 px-1 rounded uppercase tracking-tighter">
+                          <span className="text-[10px] font-bold text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2 rounded-lg uppercase tracking-widest">
                             {req.type}
                           </span>
                           {req.reason && (
-                            <span className="text-[10px] font-medium text-amber-800 italic ml-1">
+                            <span className="text-[10px] font-medium text-slate-400 italic ml-1">
                               "{req.reason}"
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <button
                         onClick={async () => {
                           await safeFirestoreWrite(
@@ -131,9 +132,9 @@ export function AssignmentsTab({
                             handleFirestoreError,
                           );
                         }}
-                        className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                        className="bg-emerald-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-lg active:scale-95 border border-emerald-500/30"
                       >
-                        Approve
+                        Authorize
                       </button>
                       <button
                         onClick={async () => {
@@ -147,9 +148,9 @@ export function AssignmentsTab({
                             handleFirestoreError,
                           );
                         }}
-                        className="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md active:scale-95"
+                        className="bg-rose-600 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-500 transition-all shadow-lg active:scale-95 border border-rose-500/30"
                       >
-                        Deny
+                        Refuse
                       </button>
                     </div>
                   </div>
@@ -159,68 +160,68 @@ export function AssignmentsTab({
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[450px]">
-        <div className="px-5 py-4 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between bg-gray-50/50 gap-4">
-          <div className="flex items-center gap-4">
-            <h3 className="font-black text-text-dark uppercase tracking-tight text-xs flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" />
-              Invigilation Overview
+      <div className="bento-card overflow-hidden flex flex-col min-h-[450px]">
+        <div className="px-6 py-5 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between bg-white/[0.01] gap-6">
+          <div className="flex items-center gap-6">
+            <h3 className="font-bold text-white uppercase tracking-[0.2em] text-[10px] flex items-center gap-3">
+              <Clock className="w-5 h-5 text-indigo-400" />
+              Invigilation Node
             </h3>
-            <div className="flex items-center gap-2">
-              <div className="flex bg-gray-200/50 p-1 rounded-xl">
+            <div className="flex items-center flex-wrap gap-3">
+              <div className="flex bg-slate-950 p-1 rounded-2xl border border-white/5 shadow-inner">
                 <button
                   onClick={() => setAssignmentsSubTab("SUMMARY")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "SUMMARY" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "SUMMARY" ? "bg-indigo-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"}`}
                 >
-                  Summary
+                  Briefing
                 </button>
                 <button
                   onClick={() => setAssignmentsSubTab("TABLE")}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "TABLE" ? "bg-white text-curro-blue shadow-sm" : "text-text-muted hover:text-text-dark"}`}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${assignmentsSubTab === "TABLE" ? "bg-indigo-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"}`}
                 >
-                  Invigilation Table
+                  Raw Matrix
                 </button>
               </div>
               <button
                 onClick={() => setShowStats(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-xl text-[10px] font-black text-emerald-700 hover:bg-emerald-100 transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-2.5 px-5 py-2 bg-slate-900 border border-white/5 rounded-xl text-[10px] font-black text-slate-300 hover:text-white hover:border-white/10 transition-all shadow-lg active:scale-95"
               >
-                <BarChart2 className="w-3.5 h-3.5" />
-                STATS
+                <BarChart2 className="w-4 h-4 text-emerald-400" />
+                METRICS
               </button>
               <button
                 onClick={handleExportAssignmentsCSV}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-text-dark hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-2.5 px-5 py-2 bg-slate-900 border border-white/5 rounded-xl text-[10px] font-black text-slate-300 hover:text-white hover:border-white/10 transition-all shadow-lg active:scale-95"
               >
-                <Download className="w-3.5 h-3.5" />
-                EXPORT CSV
+                <Download className="w-4 h-4 text-indigo-400" />
+                EXPORT
               </button>
               <button
                 onClick={() => setEnableCheckMode(!enableCheckMode)}
-                className={`flex items-center gap-2 px-3 py-1.5 border rounded-xl text-[10px] font-black transition-all shadow-sm active:scale-95 ${
+                className={`flex items-center gap-2.5 px-5 py-2 border rounded-xl text-[10px] font-black transition-all shadow-lg active:scale-95 ${
                   enableCheckMode
-                    ? "bg-curro-red text-white border-curro-red"
-                    : "bg-white text-text-dark border-gray-200 hover:bg-gray-50"
+                    ? "bg-rose-600 text-white border-rose-500 shadow-rose-900/20"
+                    : "bg-slate-900 text-slate-300 border-white/5 hover:border-white/10"
                 }`}
               >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                {enableCheckMode ? "HIDE CHECK" : "CHECK"}
+                <ShieldAlert className="w-4 h-4" />
+                {enableCheckMode ? "HALT PROBE" : "PROBE"}
               </button>
               <button
                 onClick={() => handleEqualize(true)}
                 disabled={isEqualizing || isGenerating}
-                className="flex items-center gap-2 px-3 py-1.5 bg-curro-blue text-white border border-curro-blue rounded-xl text-[10px] font-black hover:bg-black transition-all shadow-sm active:scale-95"
+                className="flex items-center gap-2.5 px-5 py-2 bg-indigo-600 text-white border border-indigo-500 rounded-xl text-[10px] font-black hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-900/20 active:scale-95 group"
               >
-                <Wand2 className="w-3.5 h-3.5" />
-                FIX ERRORS
+                <Wand2 className={`w-4 h-4 group-hover:rotate-12 transition-transform ${isEqualizing ? 'animate-spin' : ''}`} />
+                {isEqualizing ? "ADJUSTING..." : "SYNC GRID"}
               </button>
             </div>
           </div>
           {lastUpdatedDate && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-xl">
-              <History className="w-3 h-3 text-curro-blue" />
-              <span className="text-[10px] font-black text-curro-blue uppercase tracking-widest">
-                Last Updated: {format(lastUpdatedDate, "d MMM, HH:mm")}
+            <div className="flex items-center gap-3 px-4 py-2 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl backdrop-blur-sm">
+              <History className="w-4 h-4 text-indigo-400" />
+              <span className="text-[10px] font-bold text-indigo-400/80 uppercase tracking-widest">
+                Pulse: {format(lastUpdatedDate, "d MMM, HH:mm")}
               </span>
             </div>
           )}
@@ -230,28 +231,28 @@ export function AssignmentsTab({
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white border-b border-gray-100">
-                  <th className={TH_CLASS}>
-                    Date
+                <tr className="bg-white/[0.02] border-b border-white/5">
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Temporal
                   </th>
-                  <th className={TH_CLASS}>
-                    Subject
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Specialization
                   </th>
-                  <th className={TH_CLASS}>
-                    Time / Session
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Latency / Window
                   </th>
-                  <th className={TH_CLASS}>
-                    Location (Venue)
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Coordinates (Sector)
                   </th>
-                  <th className={TH_CLASS}>
-                    Staff (Assigned)
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Operatives Assigned
                   </th>
-                  <th className={`${TH_CLASS} text-right`}>
-                    Action
+                  <th className={`${TH_CLASS} py-5 text-right text-indigo-400/50`}>
+                    Control
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-white/5">
               {entries
                 .flatMap((entry) => {
                   const assignedVenues = entry.venueIds || [];
@@ -293,52 +294,52 @@ export function AssignmentsTab({
                   return (
                     <tr
                       key={`${entry.id}-${venueId || idx}`}
-                      className="hover:bg-gray-50/30 transition-all group"
+                      className="hover:bg-white/[0.03] transition-all group"
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold text-text-dark">
+                          <span className="text-xs font-bold text-slate-100">
                             {format(parseISO(entry.date), "EEE, d MMM")}
                           </span>
-                          <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                             {entry.date}
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-text-dark leading-tight">
+                          <span className="text-sm font-bold text-slate-100 leading-tight">
                             {entry.subject}
                           </span>
-                          <span className="text-[10px] text-text-muted font-black uppercase tracking-widest bg-gray-100 px-1.5 py-0.5 rounded w-fit mt-1">
-                            Grade {entry.grade}
+                          <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-lg w-fit mt-1.5 transition-colors group-hover:bg-indigo-500/20">
+                            Nexus Gr {entry.grade}
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="text-xs font-mono font-bold text-curro-blue tracking-tighter mb-0.5">
+                          <span className="text-xs font-mono font-bold text-emerald-400 tracking-tighter mb-1">
                             {getEntryTimes(entry, entries).start}
                           </span>
-                          <span className="text-[10px] text-text-muted font-bold uppercase tracking-tighter">
-                            {entry.durationMinutes || 120}m ({entry.paperType})
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                            {entry.durationMinutes || 120}m · {entry.paperType}
                           </span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-5">
                         {venue ? (
-                          <div className="flex items-center gap-1.5 text-text-dark font-black text-[10px] uppercase tracking-tighter">
-                            <MapPin className="w-3.5 h-3.5 text-curro-red" />
+                          <div className="flex items-center gap-2 text-slate-100 font-black text-[10px] uppercase tracking-widest">
+                            <MapPin className="w-4 h-4 text-rose-500" />
                             {venue.name}
                           </div>
                         ) : (
-                          <span className={`text-[10px] font-bold uppercase italic ${venueId === "GRADE" ? "text-blue-600" : "text-amber-600"}`}>
-                            {venueId === "GRADE" ? `Grade ${entry.grade} Standby` : (venueId === "manual" ? "Manual Slot" : "No Venue Set")}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest italic ${venueId === "GRADE" ? "text-indigo-400" : "text-amber-500"}`}>
+                            {venueId === "GRADE" ? `Gr ${entry.grade} Reserve` : (venueId === "manual" ? "Override" : "Sector Unmapped")}
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1">
+                      <td className="px-6 py-5">
+                        <div className="flex flex-wrap gap-2">
                           {assignedStaffIds.length > 0 ? (
                             assignedStaffIds.map((tid) => {
                               const t = teachers.find((t) => t.id === tid);
@@ -349,30 +350,30 @@ export function AssignmentsTab({
                               return (
                                 <div
                                   key={tid}
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter border transition-all ${
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
                                     hasConflict
-                                      ? "bg-curro-red text-white border-curro-red animate-pulse scale-110 shadow-lg"
-                                      : "bg-gray-100 text-text-dark border-gray-200"
+                                      ? "bg-rose-600 text-white border-rose-500 animate-pulse shadow-lg"
+                                      : "bg-slate-900 text-slate-300 border-white/5 hover:border-white/10"
                                   }`}
-                                  title={t ? `${t.firstName} ${t.lastName}${hasConflict ? ' (CONFLICT DETECTED)' : ''}` : tid}
+                                  title={t ? `${t.firstName} ${t.lastName}${hasConflict ? ' (COLLISION DETECTED)' : ''}` : tid}
                                 >
                                   {t ? `${t.firstName[0]}${t.lastName[0]}` : tid}
                                 </div>
                               );
                             })
                           ) : (
-                            <span className="text-[10px] text-text-muted opacity-50 uppercase font-bold italic">
-                              Unassigned
+                            <span className="text-[10px] text-slate-600 opacity-50 uppercase font-black tracking-widest italic">
+                              Undeployed
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-right">
+                      <td className="px-6 py-5 text-right">
                         <button
                           onClick={() => setActiveTab("SCHEDULER")}
-                          className="text-curro-blue font-black text-[10px] uppercase tracking-widest hover:bg-curro-blue hover:text-white px-2 py-1.5 rounded-lg border border-blue-100 transition-all active:scale-95 bg-blue-50/50"
+                          className="text-indigo-400 font-black text-[10px] uppercase tracking-[0.15em] hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl border border-indigo-500/20 transition-all active:scale-95 bg-indigo-500/5 backdrop-blur-sm"
                         >
-                          {assignedStaffIds.length > 0 ? "EDIT" : "SCHEDULE"}
+                          {assignedStaffIds.length > 0 ? "RECONFIGURE" : "DEPLOY"}
                         </button>
                       </td>
                     </tr>
@@ -385,34 +386,34 @@ export function AssignmentsTab({
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-white border-b border-gray-100">
-                  <th className={TH_CLASS}>
-                    Date
+                <tr className="bg-white/[0.02] border-b border-white/5">
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Temporal
                   </th>
-                  <th className={TH_CLASS}>
-                    Grade & Subject
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Specialization
                   </th>
-                  <th className={TH_CLASS}>
-                    Venue
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Sector
                   </th>
-                  <th className={TH_CLASS}>
-                    Period Slot
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Nexus Slot
                   </th>
-                  <th className={TH_CLASS}>
-                    Invigilator
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Operative
                   </th>
-                  <th className={TH_CLASS}>
-                    Role
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Protocol
                   </th>
-                  <th className={TH_CLASS}>
-                    Exam Start
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Init
                   </th>
-                  <th className={TH_CLASS}>
-                    Exam End
+                  <th className={`${TH_CLASS} py-5 text-indigo-400/50`}>
+                    Term
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-white/5">
                 {entries
                   .flatMap((entry) => {
                     const assignments = entry.invigilatorAssignments || {};
@@ -436,7 +437,7 @@ export function AssignmentsTab({
                         periodLabel: period?.label || `P${pIdx + 1}`,
                         periodTime: period ? `${period.start} - ${period.end}` : "",
                         periodStart: period?.start || "00:00",
-                        invigilator: teacher ? `${teacher.firstName} ${teacher.lastName}` : (teacherId === "REMAINDER_OF_DAY_BUSY" ? "Specialist Prep" : teacherId),
+                        invigilator: teacher ? `${teacher.firstName} ${teacher.lastName}` : (teacherId === "REMAINDER_OF_DAY_BUSY" ? "Tech Lockdown" : teacherId),
                         role: teacher?.invigilationPreference || "SCATTERED",
                         examStart: startStr,
                         examEnd: endTimeStr,
@@ -485,59 +486,59 @@ export function AssignmentsTab({
 
                     const isDarkBg = isOPS || isError || isWarning;
 
-                    let bgClass = "hover:bg-gray-50/50";
-                    if (isError) {bgClass = "bg-red-600 text-white animate-pulse shadow-lg z-10 relative";}
-                    else if (isWarning) {bgClass = "bg-orange-500 text-white shadow-inner";}
-                    else if (isOPS) {bgClass = "bg-curro-red text-white";}
-                    else if (isScattered) {bgClass = "bg-cyan-100/80";}
-                    else if (isMarathon) {bgClass = "bg-rose-100/80";}
+                    let bgClass = "hover:bg-white/[0.03]";
+                    if (isError) {bgClass = "bg-rose-600/20 text-white border-l-4 border-rose-500 z-10 relative";}
+                    else if (isWarning) {bgClass = "bg-amber-500/20 text-white border-l-4 border-amber-500";}
+                    else if (isOPS) {bgClass = "bg-rose-900/40 text-rose-100 border-l-4 border-rose-600/50";}
+                    else if (isScattered) {bgClass = "bg-sky-500/5 text-sky-100 border-l-4 border-sky-500/30";}
+                    else if (isMarathon) {bgClass = "bg-amber-500/5 text-amber-100 border-l-4 border-amber-500/30";}
 
                     return (
-                      <tr key={row.id} className={`${bgClass} transition-all duration-300 border-b border-gray-100/50`}>
-                        <td className="px-5 py-4 text-[10px] font-bold">
+                      <tr key={row.id} className={`${bgClass} transition-all duration-300 border-b border-white/5`}>
+                        <td className="px-6 py-5 text-[10px] font-bold text-slate-100">
                           {format(parseISO(row.date), "EEE, d MMM")}
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-6 py-5">
                           <div className="flex flex-col">
-                            <span className={`text-[10px] font-black uppercase tracking-tighter ${isDarkBg ? 'text-white' : 'text-curro-blue'}`}>
-                              Grade {row.grade}
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkBg ? 'text-white' : 'text-indigo-400'}`}>
+                              Nexus Gr {row.grade}
                             </span>
-                            <span className="text-[10px] font-bold uppercase">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                               {row.subject}
                             </span>
                           </div>
                         </td>
-                        <td className="px-5 py-4 text-[10px] font-bold">
+                        <td className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-300">
                           {row.venueName}
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-6 py-5">
                           <div className="flex flex-col">
-                            <span className={`text-[10px] font-black uppercase ${isDarkBg ? 'text-white' : 'text-emerald-600'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkBg ? 'text-white' : 'text-emerald-400'}`}>
                               {row.periodLabel}
                             </span>
-                            <span className={`text-[10px] font-mono font-bold ${isDarkBg ? 'text-white/80' : 'text-text-muted'}`}>
+                            <span className={`text-[10px] font-mono font-bold ${isDarkBg ? 'text-white/80' : 'text-slate-600'}`}>
                               {row.periodTime}
                             </span>
                           </div>
                         </td>
-                        <td className="px-5 py-4 text-[10px] font-bold flex items-center gap-2">
+                        <td className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-100 flex items-center gap-3">
                           {row.invigilator}
-                          {isError && <ShieldAlert className="w-3 h-3 text-white" />}
-                          {isWarning && <Zap className="w-3 h-3 text-white" />}
+                          {isError && <ShieldAlert className="w-4 h-4 text-rose-500 animate-pulse" />}
+                          {isWarning && <Zap className="w-4 h-4 text-amber-500" />}
                         </td>
-                        <td className="px-5 py-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${
-                            isDarkBg ? 'bg-white/20 text-white border-white/30' :
-                            isScattered ? 'bg-cyan-500/20 text-cyan-700 border-cyan-500/30' :
-                            'bg-rose-500/20 text-rose-700 border-rose-500/30'
+                        <td className="px-6 py-5">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.2em] border ${
+                            isDarkBg ? 'bg-white/10 text-white border-white/20' :
+                            isScattered ? 'bg-sky-500/10 text-sky-400 border-sky-500/20' :
+                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           }`}>
                             {row.role}
                           </span>
                         </td>
-                        <td className={`px-5 py-4 text-[10px] font-mono font-bold ${isDarkBg ? 'text-white' : 'text-amber-600'}`}>
+                        <td className={`px-6 py-5 text-[10px] font-mono font-bold ${isDarkBg ? 'text-white' : 'text-emerald-400'}`}>
                           {row.examStart}
                         </td>
-                        <td className={`px-5 py-4 text-[10px] font-mono font-bold ${isDarkBg ? 'text-white' : ''}`}>
+                        <td className={`px-6 py-5 text-[10px] font-mono font-bold ${isDarkBg ? 'text-white' : 'text-slate-400'}`}>
                           {row.examEnd}
                         </td>
                       </tr>
@@ -549,23 +550,21 @@ export function AssignmentsTab({
         )}
       </div>
 
-      {/* Rewards Section */}
-      <div className="bg-curro-blue rounded-xl p-6 text-white shadow-xl relative overflow-hidden group">
-        <div className="absolute -top-4 -right-4 p-8 opacity-10 group-hover:scale-125 transition-transform group-hover:-rotate-12">
-          <ArrowUpRight className="w-32 h-32" />
-        </div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="max-w-md">
-            <h4 className="text-xl font-black mb-1 flex items-center gap-2">
-              Staff Load Balancer
-              <div className="w-2 h-2 rounded-full bg-curro-red animate-pulse" />
+      {/* Grid Status Section */}
+      <div className="bg-indigo-600 rounded-2xl p-8 text-white shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-[100px] -mr-48 -mt-48 group-hover:bg-white/20 transition-all duration-700"></div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="max-w-xl">
+            <h4 className="text-2xl font-black mb-2 flex items-center gap-4">
+              Nexus Load Balancer
+              <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.5)] animate-pulse" />
             </h4>
-            <p className="text-white/70 font-bold text-[10px] uppercase tracking-widest">
-              Autonomous Reward Distribution System
+            <p className="text-white/60 font-bold text-[10px] uppercase tracking-[0.3em] leading-relaxed">
+              Autonomous Resource Allocation & Stability Protocol
             </p>
           </div>
-          <button className="bg-white text-curro-blue px-4 py-2 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-blue-50 transition-all shadow-lg active:scale-95">
-            GENERATE REPORT
+          <button className="bg-slate-950 text-white hover:bg-black px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-2xl active:scale-95 border border-white/5">
+            GENERATE DIAGNOSTIC
           </button>
         </div>
       </div>

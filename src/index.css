@@ -7,21 +7,47 @@
   
   --color-curro-blue: #00468B;
   --color-curro-red: #E31B23;
-  --color-bg-gray: #F4F7F9;
-  --color-text-dark: #1A1A1A;
-  --color-text-muted: #666666;
-  --color-status-green: #28A745;
-  --color-status-yellow: #FFC107;
+  --color-status-green: #22c55e;
+  --color-status-yellow: #eab308;
+
+  /* Theme-aware variables - using legacy names for compatibility */
+  --color-bg-gray: #09090b;
+  --color-text-dark: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-bento-card: rgba(15, 23, 42, 0.5);
+  --color-bento-border: #1e293b;
+  --color-bento-accent: #6366f1;
+}
+
+:root.light {
+  --color-bg-gray: #f8fafc;
+  --color-text-dark: #0f172a;
+  --color-text-muted: #64748b;
+  --color-bento-card: #ffffff;
+  --color-bento-border: #e2e8f0;
+  --color-bento-accent: #4f46e5;
 }
 
 @layer base {
   body {
-    @apply bg-bg-gray text-text-dark antialiased;
+    background-color: var(--color-bg-gray);
+    color: var(--color-text-dark);
+    @apply antialiased font-sans transition-colors duration-300;
   }
 }
 
+.bento-card {
+  background-color: var(--color-bento-card);
+  border: 1px solid var(--color-bento-border);
+  @apply rounded-3xl p-6 transition-all duration-300;
+}
+
+.bento-card-active {
+  @apply border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.15)];
+}
+
 .status-pill {
-  @apply text-[10px] px-2 py-0.5 rounded font-bold uppercase;
+  @apply text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider;
 }
 
 .status-green { @apply bg-emerald-100 text-status-green; }

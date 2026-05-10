@@ -3,6 +3,8 @@ import {
   Teacher,
   TimetableEntry,
   PeriodConfig,
+  SchedulerSettings,
+  Subject,
 } from "../../types";
 import { useSessions } from "../../hooks/useSessions";
 import { useAssignments } from "../../hooks/useAssignments";
@@ -11,6 +13,7 @@ import { useTimetableEntries } from "../../hooks/useTimetableEntries";
 import { useVenues } from "../../hooks/useVenues";
 import { useSubjects } from "../../hooks/useSubjects";
 import { useDayPeriodConfigs } from "../../hooks/useDayPeriodConfigs";
+import { useSchedulerSettings } from "../../hooks/useSchedulerSettings";
 import { db, handleFirestoreError, OperationType } from "../../firebase";
 import {
   doc,
@@ -43,6 +46,8 @@ import {
   CalendarRange,
   Minimize2,
   Maximize2,
+  Activity,
+  ShieldAlert,
 } from "lucide-react";
 import { TabButton, Tabs, useToast } from "../ui";
 import { INITIAL_TEACHERS } from "../../data";
@@ -64,6 +69,7 @@ import { TimetableTab } from "./tabs/TimetableTab";
 import { VenuesTab } from "./tabs/VenuesTab";
 import { SchedulerTab } from "./tabs/SchedulerTab";
 import { InspectionTab } from "./tabs/InspectionTab";
+import { generateSchedule } from "../../services/schedulingService";
 
 // Modal components
 import { TimetableModal } from "./modals/TimetableModal";
@@ -94,6 +100,9 @@ import {
   SHEH_OVERRIDE_DATES,
   isTeacherOnLeaveAtPeriod as _isTeacherOnLeaveAtPeriod,
   safeFirestoreWrite,
+  getTimetableCell,
+  hasGradeMarkerInPeriod,
+  isTeacherAllowedForGradeOnDate as isTeacherAllowedForEntry,
 } from "./shared/helpers";
 
 interface Props {
@@ -118,6 +127,40 @@ export default function AdminPanel({
   const { data: venues } = useVenues();
   const { data: subjects } = useSubjects();
   const { data: dayPeriodConfigs } = useDayPeriodConfigs();
+  const { data: rawSettings } = useSchedulerSettings();
+  const settings = useMemo(() => {
+    if (rawSettings && rawSettings.length > 0) return rawSettings[0];
+    return {
+      id: 'default',
+      grade12Range: { start: '', end: '' },
+      grade10_11Range: { start: '', end: '' },
+      grade8_9Range: { start: '', end: '' },
+      reserveRange: { start: '', end: '' },
+      techAssignments: [],
+      maxDailyMinutes: 360,
+      techManualOnly: false,
+      techTeachersNoInvigilationOnTechDay: false,
+      equalizeMinutesWithTechDiscount: false,
+      equalizeStandbySeparately: false,
+      roleActiveRange: { start: '', end: '' },
+      followDistributionPattern: false,
+      wednesdayHomeroomInvigilation: false,
+    } as SchedulerSettings;
+  }, [rawSettings]);
+
+  const handleUpdateSettings = async (newSettings: SchedulerSettings) => {
+    try {
+      const settingsRef = doc(db, 'settings', 'scheduler');
+      await setDoc(settingsRef, {
+        ...newSettings,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success('Scheduler settings updated');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'settings/scheduler');
+    }
+  };
+
   const toast = useToast();
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -343,16 +386,10 @@ export default function AdminPanel({
     dateStr?: string,
   ) => {
     const targetDate = dateStr || selectedDate;
-    return entries.some(
-      (e) =>
-        e.date === targetDate &&
-        e.grade === grade &&
-        e.invigilatorAssignments &&
-        Object.keys(e.invigilatorAssignments).some((k) =>
-          k.startsWith(`${periodIdx}_`),
-        ) &&
-        Object.values(e.invigilatorAssignments).includes(teacher.id),
-    );
+    const cell = getTimetableCell(teacher, periodIdx, targetDate);
+    if (!cell) return false;
+    const cellStr = String(cell);
+    return cellStr.includes(`[${grade}]`) || cellStr.includes(String(grade));
   };
 
   const isFreeInPeriod = (
@@ -377,10 +414,12 @@ export default function AdminPanel({
   );
 
   const handleAutoGenerate = async () => {
-    if (hasIncompleteVenues) {return;}
+    if (hasIncompleteVenues) {
+      toast.error("Some sessions are missing venues. Assign venues first.");
+      return;
+    }
     setIsGenerating(true);
     setGenProgress(0);
-    setRepackCount(0);
     setGenElapsedTime(0);
     const startTime = Date.now();
 
@@ -397,393 +436,46 @@ export default function AdminPanel({
         clearInterval(timer);
         return;
       }
-      const daysInRange = eachDayOfInterval({ start: startDate, end: endDate });
-      const localTeachers = teachers.filter((t) =>
-        t.invigilationPreference !== "OPS" && isEligibleForInvigilation(t)
-      );
 
-      const uniqueEntryDates = new Set(entries.filter(e => {
+      const entriesInRange = entries.filter(e => {
         const d = parseISO(e.date);
         return !isBefore(d, startDate) && !isAfter(d, endDate);
-      }).map(e => e.date));
-      const totalDays = uniqueEntryDates.size || 1;
-      const activeInvigilatorCount = localTeachers.length || 36;
-
-      let totalReqMinutes = 0;
-      entries.forEach(e => {
-        const eDate = parseISO(e.date);
-        if (isBefore(eDate, startDate) || isAfter(eDate, endDate)) {return;}
-        const relevantPIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
-        const assignedVenuesList = venues.filter((v) => e.venueIds?.includes(v.id));
-        const datePeriods = getPeriodsForDate(e.date);
-
-        relevantPIdxs.forEach(pIdx => {
-          const p = datePeriods[pIdx];
-          if (!p) {return;}
-          const dur = periodDurationMinutes(p);
-
-          totalReqMinutes += dur;
-          assignedVenuesList.forEach(venue => {
-            const invCount = (venue.name?.toLowerCase().includes("hall") || venue.type === "Hall")
-              ? (e.grade === 12 ? Math.ceil((e.totalStudents || 0) / 30) || 1 : Math.ceil((e.totalStudents || 0) / 25) || 1)
-              : 1;
-            totalReqMinutes += dur * invCount;
-          });
-        });
       });
 
-      const totalWorkloadUnits = localTeachers.reduce((sum, t) => sum + (t.workloadPercentage || 100) / 100, 0);
-      const standardMinutesPerUnit = (totalReqMinutes / totalDays) / activeInvigilatorCount;
-      const teacherRangeTargets = Object.fromEntries(localTeachers.map(t => [t.id, (standardMinutesPerUnit * (t.workloadPercentage || 100) / 100) / 60]));
-
-      const teacherHours = Object.fromEntries(localTeachers.map(t => [t.id, 0]));
-      const standbyCounts = Object.fromEntries(localTeachers.map(t => [t.id, 0]));
-      const teacherHoursInRange = Object.fromEntries(localTeachers.map(t => [t.id, 0]));
-
-      entries.forEach(e => {
-        if (!e.invigilatorAssignments) {return;}
-        const eDate = parseISO(e.date);
-        const inRange = !isBefore(eDate, startDate) && !isAfter(eDate, endDate);
-        const datePeriods = getPeriodsForDate(e.date);
-
-        Object.entries(e.invigilatorAssignments).forEach(([key, tid]) => {
-          if (teacherHours[tid] === undefined) {return;}
-
-          const isTech = key.includes("_TECH_");
-          if (!inRange || isTech) {
-            const pIdx = parseInt(key.split("_")[0]);
-            const period = datePeriods[pIdx];
-            if (period) {
-              const pDuration = periodDurationMinutes(period) / 60;
-              teacherHours[tid] += pDuration;
-            }
-          }
-
-          if (key.includes("_STANDBY_") && !inRange) {
-            standbyCounts[tid]++;
-          }
-        });
-      });
-
-      const studentCountsPerDay: Record<string, number> = {};
-      entries.forEach(e => {
-        studentCountsPerDay[e.date] = (studentCountsPerDay[e.date] || 0) + (e.totalStudents || 0);
-      });
-
-      const entryDatesSortedByLearners = Array.from(uniqueEntryDates).sort((a, b) =>
-        (studentCountsPerDay[a] || 0) - (studentCountsPerDay[b] || 0)
-      );
-
-      const rewardDays: Record<string, string> = {};
-      localTeachers.filter(t => t.hasReward).forEach((t, idx) => {
-        const dayIdx = idx % Math.max(1, Math.min(3, entryDatesSortedByLearners.length));
-        rewardDays[t.id] = entryDatesSortedByLearners[dayIdx];
-      });
-
-      const assignedOnPrevDay = new Set<string>();
-      for (let dayIdx = 0; dayIdx < daysInRange.length; dayIdx++) {
-        const day = daysInRange[dayIdx];
-        const dateStr = format(day, "yyyy-MM-dd");
-        setGenProgress(Math.floor((dayIdx / daysInRange.length) * 100));
-
-        let success = false;
-        let dayRepacks = 0;
-        const MAX_DAY_REPACKS = 100;
-
-        const hoursSnapshot = { ...teacherHours };
-        const standbySnapshot = { ...standbyCounts };
-        const rangeHoursSnapshot = { ...teacherHoursInRange };
-
-        while (!success && dayRepacks < MAX_DAY_REPACKS) {
-          if (dayRepacks > 0) {setRepackCount(prev => prev + 1);}
-
-          const assignedAsTechToday = new Set<string>();
-          const dayAssignments: { [tId: string]: { [pIdx: number]: string } } = {};
-          const dayEntries = entries
-            .filter((e) => e.date === dateStr)
-            .sort((a, b) => b.grade - a.grade);
-
-          const grade12SubjectsToday = Array.from(new Set(dayEntries
-            .filter(e => e.grade === 12)
-            .map(e => e.subject)));
-
-          dayEntries.forEach(e => {
-            if (SHEH_OVERRIDE_DATES.has(e.date) && e.subject.toLowerCase().includes("visual art")) {
-              const pIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
-              if (!e.invigilatorAssignments) {e.invigilatorAssignments = {};}
-              pIdxs.forEach(p => {
-                const venueId = e.venueIds?.[0] || "MANUAL";
-                const key = getAssignmentKey(p, venueId, "TECH", 0);
-                e.invigilatorAssignments![key] = "SHEH";
-              });
-            }
-          });
-
-          dayEntries.forEach(e => {
-            if (!e.invigilatorAssignments) {e.invigilatorAssignments = {};}
-            const isPrac = e.paperType === "Prac";
-            if (isPrac) {
-              const pIdxs = getRelevantPeriodsIdx(e.session, e.durationMinutes || 180, e);
-              const venueId = e.venueIds?.[0] || "MANUAL";
-
-              pIdxs.forEach(p => {
-                const key = getAssignmentKey(p, venueId, "TECH", 0);
-                const currentTid = e.invigilatorAssignments![key];
-
-                if (currentTid) {
-                  const t = teachers.find(tx => tx.id === currentTid);
-                  if (!t || !isTechnicalStaffEligible(t, e.subject)) {
-                    delete e.invigilatorAssignments![key];
-                  }
-                }
-
-                if (!e.invigilatorAssignments![key]) {
-                  const specialist = localTeachers.find(t =>
-                    isTechnicalStaffEligible(t, e.subject) &&
-                    !dayAssignments[t.id]?.[p] &&
-                    !isTeacherOnLeaveAtPeriod(t.id, p, dateStr)
-                  );
-                  if (specialist) {
-                    e.invigilatorAssignments![key] = specialist.id;
-                  }
-                }
-
-                const finalTid = e.invigilatorAssignments![key];
-                if (finalTid) {
-                  if (!dayAssignments[finalTid]) {dayAssignments[finalTid] = {};}
-                  dayAssignments[finalTid][p] = "TECH";
-                  assignedAsTechToday.add(finalTid);
-                }
-              });
-            }
-          });
-
-          Object.assign(teacherHours, hoursSnapshot);
-          Object.assign(standbyCounts, standbySnapshot);
-          Object.assign(teacherHoursInRange, rangeHoursSnapshot);
-
-          let dayFailed = false;
-
-          const stints: { entry: TimetableEntry, venueId: string, pIdxs: number[], role: "INVIGILATOR" | "STANDBY", subIdx?: number }[] = [];
-
-          dayEntries.forEach(entry => {
-            const relevantPIdxs = getRelevantPeriodsIdx(entry.session, entry.durationMinutes || 180, entry);
-            const assignedVenuesList = venues.filter((v) => entry.venueIds?.includes(v.id));
-
-            relevantPIdxs.forEach(pIdx => {
-              stints.push({ entry, venueId: "GRADE", pIdxs: [pIdx], role: "STANDBY" });
-            });
-
-            assignedVenuesList.forEach(venue => {
-              const invCount = (venue.name?.toLowerCase().includes("hall") || venue.type === "Hall")
-                ? (entry.grade === 12 ? Math.ceil((entry.totalStudents || 0) / 30) || 1 : Math.ceil((entry.totalStudents || 0) / 25) || 1)
-                : 1;
-
-              for (let i = 0; i < invCount; i++) {
-                const chunkSize = 3;
-                if (relevantPIdxs.length > chunkSize) {
-                  for (let start = 0; start < relevantPIdxs.length; start += chunkSize) {
-                    stints.push({
-                      entry,
-                      venueId: venue.id,
-                      pIdxs: relevantPIdxs.slice(start, start + chunkSize),
-                      role: "INVIGILATOR",
-                      subIdx: i
-                    });
-                  }
-                } else {
-                  stints.push({ entry, venueId: venue.id, pIdxs: relevantPIdxs, role: "INVIGILATOR", subIdx: i });
-                }
-              }
-            });
-          });
-
-          const getSubjectPriority = (subject: string) => {
-            const s = (subject || "").toLowerCase();
-            if (s.includes("english")) {return 1;}
-            if (s.includes("afrikaans") || s.includes("1st additional") || s.includes("additional language")) {return 2;}
-            if (s.includes("math")) {return 3;}
-            return 4;
-          };
-          stints.sort((a, b) => {
-            if (a.role === "STANDBY" && b.role !== "STANDBY") {return 1;}
-            if (a.role !== "STANDBY" && b.role === "STANDBY") {return -1;}
-            const pA = getSubjectPriority(a.entry.subject);
-            const pB = getSubjectPriority(b.entry.subject);
-            if (pA !== pB) {return pA - pB;}
-            return b.entry.grade - a.entry.grade;
-          });
-
-          for (const stint of stints) {
-            const { entry: stintEntry, venueId, pIdxs, role, subIdx = 0 } = stint;
-
-            if (role === "INVIGILATOR") {
-              for (const pIdx of pIdxs) {
-                const key = getAssignmentKey(pIdx, venueId, "INVIGILATOR", subIdx);
-                const existingTid = stintEntry.invigilatorAssignments?.[key];
-                if (existingTid) {
-                  if (!dayAssignments[existingTid]) {dayAssignments[existingTid] = {};}
-                  dayAssignments[existingTid][pIdx] = "INVIGILATOR";
-                  continue;
-                }
-
-                const isHall = venues.find(v => v.id === venueId)?.name?.toLowerCase().includes("hall") ||
-                  venues.find(v => v.id === venueId)?.type === "Hall";
-
-                const candidates = localTeachers
-                  .filter((t) => {
-                    if (dayAssignments[t.id]?.[pIdx]) {return false;}
-                    if (isTeacherOnLeaveAtPeriod(t.id, pIdx, dateStr)) {return false;}
-                    if (assignedAsTechToday.has(t.id)) {return false;}
-                    if (t.invigilationPreference === "OPS") {return false;}
-
-                    if (t.hasReward && rewardDays[t.id] === dateStr) {return false;}
-
-                    const isWednesdayFirst = isWednesday(parseISO(dateStr)) && pIdx === 0;
-                    if (isWednesdayFirst) {
-                      if (t.homeRoomGrade) {
-                        if (t.homeRoomGrade !== stintEntry.grade) {return false;}
-                      } else {
-                        if (stintEntry.grade !== 12) {return false;}
-                      }
-                    }
-
-                    if (isSHEHOverride(t.id, dateStr)) {
-                      return false;
-                    }
-
-                    const hasHallPass = t.hallPass === true;
-                    if (!hasHallPass) {
-                      const isG12 = stintEntry.grade === 12;
-                      if (isG12 || isHall) {return false;}
-                    }
-
-                    return true;
-                  })
-                  .sort((a, b) => {
-                    const aHours = teacherHoursInRange[a.id] || 0;
-                    const bHours = teacherHoursInRange[b.id] || 0;
-                    const aTarget = teacherRangeTargets[a.id] || 0;
-                    const bTarget = teacherRangeTargets[b.id] || 0;
-                    const aDeficit = aTarget - aHours;
-                    const bDeficit = bTarget - bHours;
-                    return bDeficit - aDeficit;
-                  });
-
-                const chosen = candidates[0];
-                if (chosen) {
-                  if (!stintEntry.invigilatorAssignments) {stintEntry.invigilatorAssignments = {};}
-                  stintEntry.invigilatorAssignments[key] = chosen.id;
-                  if (!dayAssignments[chosen.id]) {dayAssignments[chosen.id] = {};}
-                  dayAssignments[chosen.id][pIdx] = "INVIGILATOR";
-
-                  const datePeriods = getPeriodsForDate(dateStr);
-                  const period = datePeriods[pIdx];
-                  if (period) {
-                    const pDuration = periodDurationMinutes(period) / 60;
-                    teacherHoursInRange[chosen.id] = (teacherHoursInRange[chosen.id] || 0) + pDuration;
-                  }
-                } else {
-                  dayFailed = true;
-                }
-              }
-            } else if (role === "STANDBY") {
-              for (const pIdx of pIdxs) {
-                const key = getAssignmentKey(pIdx, venueId, "STANDBY", 0);
-                const existingTid = stintEntry.invigilatorAssignments?.[key];
-                if (existingTid) {
-                  if (!dayAssignments[existingTid]) {dayAssignments[existingTid] = {};}
-                  dayAssignments[existingTid][pIdx] = "STANDBY";
-                  continue;
-                }
-
-                const candidates = localTeachers
-                  .filter((t) => {
-                    if (dayAssignments[t.id]?.[pIdx]) {return false;}
-                    if (isTeacherOnLeaveAtPeriod(t.id, pIdx, dateStr)) {return false;}
-                    if (assignedAsTechToday.has(t.id)) {return false;}
-                    if (t.invigilationPreference === "OPS") {return false;}
-
-                    if (t.hasReward && rewardDays[t.id] === dateStr) {return false;}
-
-                    if (isSHEHOverride(t.id, dateStr)) {
-                      return false;
-                    }
-
-                    return true;
-                  })
-                  .sort((a, b) => {
-                    const aHours = teacherHoursInRange[a.id] || 0;
-                    const bHours = teacherHoursInRange[b.id] || 0;
-                    const aTarget = teacherRangeTargets[a.id] || 0;
-                    const bTarget = teacherRangeTargets[b.id] || 0;
-                    const aDeficit = aTarget - aHours;
-                    const bDeficit = bTarget - bHours;
-                    return bDeficit - aDeficit;
-                  });
-
-                const chosen = candidates[0];
-                if (chosen) {
-                  if (!stintEntry.invigilatorAssignments) {stintEntry.invigilatorAssignments = {};}
-                  stintEntry.invigilatorAssignments[key] = chosen.id;
-                  if (!dayAssignments[chosen.id]) {dayAssignments[chosen.id] = {};}
-                  dayAssignments[chosen.id][pIdx] = "STANDBY";
-
-                  const datePeriods = getPeriodsForDate(dateStr);
-                  const period = datePeriods[pIdx];
-                  if (period) {
-                    const pDuration = periodDurationMinutes(period) / 60;
-                    teacherHoursInRange[chosen.id] = (teacherHoursInRange[chosen.id] || 0) + pDuration;
-                  }
-                }
-              }
-            }
-          }
-
-          if (!dayFailed) {
-            success = true;
-            const batch = writeBatch(db);
-            for (const entry of dayEntries) {
-              if (entry.invigilatorAssignments) {
-                batch.update(doc(db, "timetableEntries", entry.id), {
-                  invigilatorAssignments: entry.invigilatorAssignments,
-                  updatedAt: new Date().toISOString(),
-                });
-              }
-            }
-            await batch.commit();
-
-            for (const entry of dayEntries) {
-              if (!entry.invigilatorAssignments) {continue;}
-              const datePeriods = getPeriodsForDate(entry.date);
-              Object.entries(entry.invigilatorAssignments).forEach(([key, tid]) => {
-                if (teacherHours[tid] === undefined) {return;}
-                const pIdx = parseInt(key.split("_")[0]);
-                const period = datePeriods[pIdx];
-                if (!period) {return;}
-                const [h1, m1] = period.start.split(":").map(Number);
-                const [h2, m2] = period.end.split(":").map(Number);
-                const pDuration = (h2 * 60 + m2 - (h1 * 60 + m1)) / 60;
-                teacherHours[tid] += pDuration;
-                teacherHoursInRange[tid] = (teacherHoursInRange[tid] || 0) + pDuration;
-
-                const vId = key.split("_")[1];
-                const role = key.split("_")[2];
-                if (vId === "GRADE" || role === "STANDBY") {
-                  standbyCounts[tid]++;
-                }
-              });
-            }
-          } else {
-            dayRepacks++;
-          }
-        }
+      if (entriesInRange.length === 0) {
+        toast.error("No entries found in the selected range.");
+        setIsGenerating(false);
+        clearInterval(timer);
+        return;
       }
 
+      setGenProgress(20);
+      const result = await generateSchedule(
+        entriesInRange,
+        teachers,
+        dayPeriodConfigs,
+        settings,
+        leaveRequests
+      );
+
+      setGenProgress(80);
+      const batch = writeBatch(db);
+      result.entries.forEach(entry => {
+        batch.update(doc(db, "timetableEntries", entry.id), {
+          invigilatorAssignments: entry.invigilatorAssignments,
+          updatedAt: new Date().toISOString()
+        });
+      });
+      
+      await batch.commit();
       setGenProgress(100);
+      toast.success(`Roster generated! Assigned ${result.stats.totalAssigned} slots.`);
+      if (result.stats.unfilledSlots > 0) {
+        toast.warning(`${result.stats.unfilledSlots} slots could not be filled.`);
+      }
     } catch (error) {
       console.error("Auto-generate failed:", error);
-      toast.error("Auto-generation failed. Please try again.");
+      toast.error("Auto-generation failed. Please check the logs.");
     } finally {
       setIsGenerating(false);
       clearInterval(timer);
@@ -904,11 +596,32 @@ export default function AdminPanel({
 
         if (t.hasReward && rewardDays[t.id] === dateStr && passLimit < 20) {return false;}
 
+        const isReserve = role === "STANDBY" || role === "RESERVE";
+        if (!isTeacherAllowedForEntry(t, entry.grade, dateStr, isReserve)) {return false;}
+
         const eDate = parseISO(dateStr);
         const sCounts = (sessionsMap || getSessionsOnDayMap(currentEntries))[t.id] || {};
         const sessions = sCounts[dateStr] || 0;
 
         if (sessions >= passLimit) {return false;}
+
+        // Check Daily Load Limit
+        if (settings.maxDailyMinutes > 0) {
+          const dayMinutes = currentEntries.filter(e => e.date === dateStr && e.invigilatorAssignments)
+            .reduce((sum, e) => {
+              const dateP = resolvePeriodsForDate(e.date);
+              return sum + Object.entries(e.invigilatorAssignments!).reduce((s, [k, tid]) => {
+                if (tid !== t.id) return s;
+                const pI = parseInt(k.split("_")[0]);
+                const per = dateP[pI];
+                if (!per) return s;
+                return s + periodDurationMinutes(per);
+              }, 0);
+            }, 0);
+          
+          const pDur = periodDurationMinutes(resolvePeriodsForDate(dateStr)[pIdx]);
+          if (dayMinutes + pDur > settings.maxDailyMinutes) return false;
+        }
 
         const isAfterJune1 = !isBefore(eDate, parseISO("2026-06-01"));
         if (!isAfterJune1) {
@@ -918,8 +631,9 @@ export default function AdminPanel({
           if (!isWriting) {return false;}
         }
 
-        const isWednesdayFirst = isWednesday(eDate) && pIdx === 0;
-        if (isWednesdayFirst) {
+        const isWed = isWednesday(eDate);
+        const isWednesdayFirst = isWed && pIdx === 0;
+        if (isWednesdayFirst && settings.wednesdayHomeroomInvigilation) {
           if (t.homeRoomGrade) {
             if (t.homeRoomGrade !== entry.grade) {return false;}
           } else {
@@ -946,8 +660,11 @@ export default function AdminPanel({
           }
         });
 
-        if (techTidsToday.has(t.id) && !(role === "TECH" || role === "TECHNICAL")) {return false;}
+        if (settings.techTeachersNoInvigilationOnTechDay && techTidsToday.has(t.id) && !(role === "TECH" || role === "TECHNICAL")) {return false;}
         if ((role === "TECH" || role === "TECHNICAL") && !isTechnicalStaffEligible(t, entry.subject)) {return false;}
+
+        // Check if manual only
+        if ((role === "TECH" || role === "TECHNICAL") && settings.techManualOnly && !respectRestricted) {return false;}
 
         const isLS = isLSSubject(entry.subject);
         const isPrac = entry.paperType === "Prac";
@@ -1340,7 +1057,7 @@ export default function AdminPanel({
     );
 
     entries.forEach((entry) => {
-      const datePeriods = resolvePeriodsForDate(entry.date);
+      const datePeriods = resolvePeriodsForDate(entry.date) as any[];
 
       const periodEndOffsets = datePeriods.map((p) => {
         const [h, m] = p.end.split(":").map(Number);
@@ -1403,7 +1120,8 @@ export default function AdminPanel({
             const key = getAssignmentKey(pIdx, venue.id, "TECH", 0);
             const tid = entry.invigilatorAssignments?.[key];
             if (tid && assignedMinutes[tid] !== undefined) {
-              assignedMinutes[tid] += pDuration;
+              const techDuration = settings.equalizeMinutesWithTechDiscount ? pDuration * 0.75 : pDuration;
+              assignedMinutes[tid] += techDuration;
               teacherBreakdown[tid].tech += pDuration;
             }
           }
@@ -1426,7 +1144,7 @@ export default function AdminPanel({
     Object.values(conflictMap).forEach((dayMap) => {
       Object.values(dayMap).forEach((pMap) => {
         Object.values(pMap).forEach((ids) => {
-          if ((ids as string[]).length > 1) {totalConflicts++;}
+          if ((ids as unknown as Set<string>).size > 1) {totalConflicts++;}
         });
       });
     });
@@ -1678,71 +1396,69 @@ export default function AdminPanel({
 
 
   return (
-    <div className="flex flex-col gap-8 pb-20">
+    <div className="flex flex-col gap-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Admin Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2 border-b border-white/5">
         <div>
-          <h2 className="text-2xl font-black text-text-dark tracking-tight leading-tight">
-            Admin Control Panel
+          <h2 className="text-4xl font-black text-white tracking-tight leading-none uppercase italic">
+            Command Center
           </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-text-muted text-[10px] font-black uppercase tracking-widest bg-gray-100 inline-block px-2 py-0.5 rounded">
-              Institutional Management
+          <div className="flex items-center gap-3 mt-3">
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] bg-slate-900 border border-slate-800 px-3 py-1 rounded-lg">
+              Institutional Nexus
             </p>
             <div
-              className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${currentCycle === 1 ? "bg-curro-blue/10 text-curro-blue border-blue-200" : "bg-curro-red/10 text-curro-red border-red-200"}`}
+              className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-lg border transition-all duration-300 ${currentCycle === 1 ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"}`}
             >
-              Current Cycle: {currentCycle}
+              Temporal Cycle: {currentCycle}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-3">
           {onToggleWideLayout && (
             <button
               onClick={onToggleWideLayout}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black border transition-all shadow-sm ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-300 group ${
                 wideLayout
-                  ? "bg-curro-blue text-white border-curro-blue hover:bg-curro-blue/90"
-                  : "bg-white text-text-dark border-gray-200 hover:bg-gray-50"
+                  ? "bg-indigo-600 text-white border-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
+                  : "bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
               }`}
-              title={wideLayout ? "Exit wide layout" : "Use full screen width"}
-              aria-pressed={wideLayout}
             >
-              {wideLayout ? (
-                <Minimize2 className="w-3.5 h-3.5" />
-              ) : (
-                <Maximize2 className="w-3.5 h-3.5" />
-              )}
-              {wideLayout ? "EXIT WIDE" : "WIDE"}
+              {wideLayout ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              {wideLayout ? "Collapse UI" : "Expand UI"}
             </button>
           )}
+
+          <div className="h-8 w-[1px] bg-white/10 mx-1 hidden lg:block" />
+
           {bootstrapStatus === "SUCCESS" ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-black border border-emerald-100">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              STAFF SYNCED
+              Nexus Synced
             </div>
           ) : bootstrapStatus === "ERROR" ? (
-            <div className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-black border border-red-100">
+            <div className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 text-rose-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-rose-500/20">
               <AlertCircle className="w-3.5 h-3.5" />
-              SYNC FAILED
+              Sync Interrupted
             </div>
           ) : (
             <button
               onClick={bootstrapFaculty}
               disabled={isSaving || bootstrapStatus === "LOADING"}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-orange-200 rounded-lg text-xs font-black text-orange-600 hover:bg-orange-50 transition-all shadow-sm disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-950 border border-amber-500/20 rounded-xl text-[10px] font-black text-amber-500 hover:bg-amber-500/10 transition-all uppercase tracking-widest disabled:opacity-50"
             >
               <Database className="w-3.5 h-3.5" />
-              {bootstrapStatus === "LOADING" ? "SYNCING..." : "BOOTSTRAP"}
+              {bootstrapStatus === "LOADING" ? "Initializing..." : "Seed Database"}
             </button>
           )}
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-black text-text-dark hover:bg-gray-50 transition-all shadow-sm">
+          
+          <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[10px] font-black text-slate-400 hover:text-white hover:border-slate-600 transition-all uppercase tracking-widest">
             <Download className="w-3.5 h-3.5" />
-            EXPORT
+            Archive
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-curro-blue text-white rounded-lg text-xs font-black shadow-md hover:bg-opacity-90 transition-all">
-            <Plus className="w-3.5 h-3.5" />
-            NEW SESSION
+          <button className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/20 hover:bg-indigo-500 hover:scale-105 transition-all">
+            <Plus className="w-4 h-4" />
+            Provision
           </button>
         </div>
       </div>
@@ -1750,31 +1466,33 @@ export default function AdminPanel({
       {/* Conflict Alert Banner */}
       {workloadStats.totalConflicts > 0 && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-curro-red p-6 rounded-[32px] text-white shadow-2xl shadow-red-500/20 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative"
+          className="relative group p-1 rounded-[2.5rem] bg-gradient-to-br from-rose-500 to-rose-700 shadow-2xl shadow-rose-500/20 overflow-hidden"
         >
-          <div className="absolute top-0 right-0 w-64 h-64 -mr-20 -mt-20 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex items-center gap-5 relative z-10">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-[24px] flex items-center justify-center shadow-inner">
-              <AlertCircle className="w-10 h-10 text-white animate-pulse" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent)] pointer-events-none" />
+          <div className="relative p-6 px-8 rounded-[2.25rem] bg-rose-600/10 backdrop-blur-sm border border-white/10 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex items-center gap-6">
+              <div className="w-20 h-20 bg-white/10 backdrop-blur-xl rounded-[28px] flex items-center justify-center shadow-inner border border-white/20">
+                <ShieldAlert className="w-10 h-10 text-white animate-pulse" />
+              </div>
+              <div className="text-center md:text-left">
+                <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white mb-2">
+                  System Conflict Detected
+                </h3>
+                <p className="text-sm font-medium text-rose-100 max-w-xl leading-relaxed opacity-90">
+                  Detected <span className="font-black text-white">{workloadStats.totalConflicts} overlaps</span> in the active schedule. 
+                  Synchronicity failure detected in teacher assignments. Automated resolution recommended.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight leading-none mb-2">
-                {workloadStats.totalConflicts} Assignment Conflicts Detected
-              </h3>
-              <p className="text-sm font-medium opacity-90 max-w-lg leading-relaxed">
-                One or more staff members are scheduled for multiple venues at the same time.
-                Please review the red-highlighted entries in the staff assignment view.
-              </p>
-            </div>
+            <button
+              onClick={() => setActiveTab("ASSIGNMENTS")}
+              className="bg-white text-rose-600 px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl hover:scale-105 active:scale-95 transition-all whitespace-nowrap"
+            >
+              Resolve Matrix
+            </button>
           </div>
-          <button
-            onClick={() => setActiveTab("ASSIGNMENTS")}
-            className="bg-white text-curro-red px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-red-50 transition-all active:scale-95 whitespace-nowrap relative z-10"
-          >
-            Resolve Conflicts
-          </button>
         </motion.div>
       )}
 
@@ -1786,19 +1504,20 @@ export default function AdminPanel({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm"
+            className="bento-card p-6 relative group overflow-hidden"
           >
-            <div className="flex items-center gap-3 mb-2">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-3xl -mr-12 -mt-12 transition-all group-hover:bg-indigo-500/10" />
+            <div className="flex items-center gap-4 mb-4 relative z-10">
               <div
-                className={`p-1.5 rounded-lg ${(stat as any).bg} ${stat.color}`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner border border-white/5 bg-slate-950 transition-all group-hover:scale-110`}
               >
-                <stat.icon className="w-4 h-4" />
+                <stat.icon className={`w-5 h-5 ${stat.label.includes("Total") ? "text-indigo-400" : stat.label.includes("Active") ? "text-emerald-400" : "text-amber-400"}`} />
               </div>
-              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
                 {stat.label}
               </span>
             </div>
-            <div className="text-2xl font-black text-text-dark tracking-tighter">
+            <div className="text-3xl font-black text-white tracking-tighter relative z-10">
               {stat.value}
             </div>
           </motion.div>
@@ -1806,34 +1525,38 @@ export default function AdminPanel({
       </div>
 
       {/* Tab Switcher */}
-      <Tabs
-        value={activeTab}
-        onValueChange={(v) => setActiveTab(v as typeof activeTab)}
-        aria-label="Admin sections"
-        className="flex-wrap p-1 bg-white border border-gray-100 rounded-2xl w-fit shadow-sm"
-      >
-        <TabButton value="SUBJECTS" icon={<BookOpen className="w-4 h-4" />}>
-          Subjects
-        </TabButton>
-        <TabButton value="FACULTY" icon={<Users className="w-4 h-4" />}>
-          Faculty
-        </TabButton>
-        <TabButton value="TIMETABLE" icon={<CalendarRange className="w-4 h-4" />}>
-          Exam Time Table
-        </TabButton>
-        <TabButton value="VENUES" icon={<MapPin className="w-4 h-4" />}>
-          Venues
-        </TabButton>
-        <TabButton value="SCHEDULER" icon={<ClipboardCheck className="w-4 h-4" />}>
-          Scheduler
-        </TabButton>
-        <TabButton value="ASSIGNMENTS" icon={<ClipboardCheck className="w-4 h-4" />}>
-          Assignments
-        </TabButton>
-        <TabButton value="INSPECTION" icon={<Search className="w-4 h-4" />}>
-          Inspection
-        </TabButton>
-      </Tabs>
+      <div className="flex justify-center -mb-4 relative z-10">
+        <div className="p-1.5 bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-[2rem] flex flex-wrap gap-2 shadow-2xl">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+            aria-label="Admin sections"
+            className="flex-wrap bg-transparent border-none p-0 w-auto"
+          >
+            <TabButton value="SUBJECTS" icon={<BookOpen className="w-4 h-4" />}>
+              Subjects
+            </TabButton>
+            <TabButton value="FACULTY" icon={<Users className="w-4 h-4" />}>
+              Faculty
+            </TabButton>
+            <TabButton value="TIMETABLE" icon={<CalendarRange className="w-4 h-4" />}>
+              Exams
+            </TabButton>
+            <TabButton value="VENUES" icon={<MapPin className="w-4 h-4" />}>
+              Venues
+            </TabButton>
+            <TabButton value="SCHEDULER" icon={<ClipboardCheck className="w-4 h-4" />}>
+              Scheduler
+            </TabButton>
+            <TabButton value="ASSIGNMENTS" icon={<Activity className="w-4 h-4" />}>
+              Analytics
+            </TabButton>
+            <TabButton value="INSPECTION" icon={<Search className="w-4 h-4" />}>
+              Audit
+            </TabButton>
+          </Tabs>
+        </div>
+      </div>
 
       <div className="min-h-[600px]">
         {activeTab === "SUBJECTS" && (
@@ -1863,10 +1586,10 @@ export default function AdminPanel({
             setSelectedTeacherForBreakDuty={setSelectedTeacherForBreakDuty}
             setSelectedTeacherForHomeRoom={setSelectedTeacherForHomeRoom}
             setSelectedTeacherForLeave={setSelectedTeacherForLeave}
-            setSelectedInspectionTeacherId={setSelectedInspectionTeacherId}
-            setSelectedInspectionDate={setSelectedInspectionDate}
-            setInspectionView={setInspectionView}
-            setActiveTab={setActiveTab}
+            setSelectedInspectionTeacherId={setSelectedInspectionTeacherId as (id: string) => void}
+            setSelectedInspectionDate={setSelectedInspectionDate as (date: string | null) => void}
+            setInspectionView={setInspectionView as (view: string) => void}
+            setActiveTab={setActiveTab as (tab: string) => void}
             getTeacherStatus={getTeacherStatus}
             handleFacultyBackup={handleFacultyBackup}
             handleUpdateTeacher={handleUpdateTeacher}
@@ -1920,6 +1643,7 @@ export default function AdminPanel({
             teachers={teachers}
             entries={entries}
             venues={venues}
+            subjects={subjects}
             dayPeriodConfigs={dayPeriodConfigs}
             conflictMap={conflictMap}
             leaveRequests={leaveRequests}
@@ -1961,6 +1685,8 @@ export default function AdminPanel({
             getRelevantPeriodsIdx={getRelevantPeriodsIdx}
             hasIncompleteVenues={hasIncompleteVenues}
             hasIncompleteVenuesForSelectedDate={hasIncompleteVenuesForSelectedDate}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
           />
         )}
         {activeTab === "INSPECTION" && (

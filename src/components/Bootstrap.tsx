@@ -1,20 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import {
-  onAuthStateChanged,
-  signOut,
-  type User,
-} from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { db } from '../firebase';
 import type { Role } from '../types';
+import { useFirebase } from '../context/FirebaseContext';
 
 const ALL_ROLES: Role[] = ['ADMIN', 'WEBMASTER', 'TEACHER', 'OPERATIONAL_MANAGER'];
 
 type Phase = 'SIGNED_OUT' | 'SIGNED_IN' | 'WRITING' | 'DONE' | 'ERROR';
 
 const Bootstrap: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const { user, loading: authLoading, logout } = useFirebase();
   const [existingDoc, setExistingDoc] = useState<Record<string, unknown> | null>(null);
   const [phase, setPhase] = useState<Phase>('SIGNED_OUT');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -27,21 +22,22 @@ const Bootstrap: React.FC = () => {
   const [activeRole, setActiveRole] = useState<Role>('ADMIN');
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      setAuthLoading(false);
-      if (!u) {
-        setPhase('SIGNED_OUT');
-        setExistingDoc(null);
-        return;
-      }
-      setPhase('SIGNED_IN');
-      const display = u.displayName?.split(' ') ?? [];
-      setFirstName((prev) => prev || display[0] || '');
-      setLastName((prev) => prev || display.slice(1).join(' ') || '');
-      setEmail((prev) => prev || u.email || '');
+    if (authLoading) return;
+    if (!user) {
+      setPhase('SIGNED_OUT');
+      setExistingDoc(null);
+      return;
+    }
+
+    setPhase('SIGNED_IN');
+    const display = user.displayName?.split(' ') ?? [];
+    setFirstName((prev) => prev || display[0] || '');
+    setLastName((prev) => prev || display.slice(1).join(' ') || '');
+    setEmail((prev) => prev || user.email || '');
+
+    (async () => {
       try {
-        const snap = await getDoc(doc(db, 'users', u.uid));
+        const snap = await getDoc(doc(db, 'users', user.uid));
         if (snap.exists()) {
           const data = snap.data();
           setExistingDoc(data);
@@ -62,12 +58,11 @@ const Bootstrap: React.FC = () => {
         setExistingDoc(null);
         setErrorMsg(e instanceof Error ? e.message : String(e));
       }
-    });
-    return () => unsub();
-  }, []);
+    })();
+  }, [user, authLoading]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    await logout();
     setPhase('SIGNED_OUT');
   };
 

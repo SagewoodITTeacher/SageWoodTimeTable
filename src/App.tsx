@@ -3,8 +3,8 @@ import { Teacher, Role } from './types';
 import { INITIAL_TEACHERS } from './data';
 import Login from './components/Login';
 import PanelLoadingSpinner from './components/PanelLoadingSpinner';
-import { User as UserIcon, Shield, Briefcase, LayoutDashboard, LogOut, BarChart2 } from 'lucide-react';
-import { useFirebase } from './hooks/useFirebase';
+import { User as UserIcon, Shield, Briefcase, LayoutDashboard, LogOut, BarChart2, Sun, Moon } from 'lucide-react';
+import { useFirebase } from './context/FirebaseContext';
 import { db, handleFirestoreError, OperationType } from './firebase';
 import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { ToastProvider } from './components/ui';
@@ -22,6 +22,21 @@ export default function App() {
   const [teachers, setTeachers] = useState<Teacher[]>(INITIAL_TEACHERS);
   const [lockedDates] = useState<string[]>([]);
   const [isDataReady, setIsDataReady] = useState(false);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return (window.localStorage.getItem('curro-theme') as 'light' | 'dark') || 'dark';
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+    localStorage.setItem('curro-theme', theme);
+  }, [theme]);
+
   const [wideLayout, setWideLayout] = useState<boolean>(() => {
     if (typeof window === 'undefined') {return false;}
     return window.localStorage.getItem('curro-wide-layout') === 'true';
@@ -106,7 +121,12 @@ export default function App() {
   // The users/teachers listener is the only global listener — everything else
   // is scoped to the panel that consumes it (see src/hooks/use*.ts).
   useEffect(() => {
-    if (authLoading) {return;}
+    if (authLoading || !authUser) {
+      if (!authLoading) {
+        setIsDataReady(true);
+      }
+      return;
+    }
 
     const teachersUnsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const teacherMap = new Map<string, Teacher>();
@@ -123,7 +143,7 @@ export default function App() {
     }, (error) => {
       // Allow the app to load with initial teachers if the listener fails.
       setIsDataReady(true);
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      console.error('Failed to list users:', error);
     });
 
     return () => {
@@ -148,31 +168,29 @@ export default function App() {
 
   return (
     <ToastProvider>
-    <div className={`min-h-screen transition-colors duration-500 bg-bg-gray`}>
+    <div className={`min-h-screen transition-colors duration-500 bg-[var(--color-bg-gray)] text-[var(--color-text-dark)]`}>
       {/* Top Bar / Role Switcher */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-4 border-b-4 transition-all ${
-        activeUser.activeRole === 'WEBMASTER' 
-          ? 'bg-black border-orange-600 text-white shadow-2xl' 
-          : 'bg-curro-blue border-curro-red text-white shadow-md'
-      }`}>
-        <div className="flex items-center gap-3">
-          <div className={`p-1.5 rounded-lg flex items-center justify-center ${
-            activeUser.activeRole === 'WEBMASTER' ? 'bg-orange-500 text-white' : 'bg-white text-curro-blue shadow-lg'
-          }`}>
+      <nav className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-3rem)] max-w-7xl flex items-center justify-between px-6 py-3 bg-[var(--color-bento-card)] backdrop-blur-lg border border-[var(--color-bento-border)] rounded-2xl shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
             <LayoutDashboard className="w-5 h-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold tracking-tight text-lg leading-tight">Curro</span>
-            <span className={`text-[10px] uppercase tracking-widest font-black ${activeUser.activeRole === 'WEBMASTER' ? 'text-orange-500' : 'text-white opacity-90'}`}>Invigilation</span>
+            <span className={`font-bold tracking-tight text-lg leading-tight ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>Curro Hub</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] font-black text-indigo-400">Invigilation Ops</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div role="tablist" aria-label="Role switcher" className={`flex rounded-lg p-1 border transition-colors ${
-            activeUser.activeRole === 'WEBMASTER'
-              ? 'bg-white/10 border-white/20'
-              : 'bg-white/10 border-white/20'
-          }`}>
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="p-2 text-slate-400 hover:text-indigo-600 transition-colors rounded-xl hover:bg-indigo-500/10"
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          </button>
+
+          <div role="tablist" aria-label="Role switcher" className={`flex bg-black/40 border border-slate-800 rounded-xl p-1 ${theme === 'light' ? 'bg-slate-100 border-slate-200' : ''}`}>
             {(['WEBMASTER', 'OPERATIONAL_MANAGER', 'ADMIN', 'TEACHER'] as Role[])
               .filter(role => activeUser.roles.includes(role))
               .map((role) => (
@@ -181,59 +199,42 @@ export default function App() {
                   role="tab"
                   aria-selected={activeUser.activeRole === role}
                   onClick={() => switchRole(role)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-black tracking-wider uppercase transition-all ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all whitespace-nowrap ${
                     activeUser.activeRole === role
-                      ? (role === 'WEBMASTER' ? 'bg-orange-600 text-white shadow-lg' : 'bg-white text-curro-blue shadow-sm')
-                      : 'text-white/60 hover:text-white'
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
                   }`}
                 >
                   {role === 'WEBMASTER' && <Shield className="w-3 h-3" />}
                   {role === 'OPERATIONAL_MANAGER' && <BarChart2 className="w-3 h-3" />}
                   {role === 'ADMIN' && <Briefcase className="w-3 h-3" />}
                   {role === 'TEACHER' && <UserIcon className="w-3 h-3" />}
-                  <span className="hidden xs:inline">
+                  <span className="hidden lg:inline">
                     {role === 'OPERATIONAL_MANAGER' ? 'OPS' : (role === 'TEACHER' ? 'Invigilator' : role)}
                   </span>
                 </button>
               ))}
           </div>
           
-          <div className="flex items-center gap-3 pl-4 border-l border-white/20">
-            {activeUser.activeRole !== 'OPERATIONAL_MANAGER' && activeUser.roles.includes('OPERATIONAL_MANAGER') && (
-              <div
-                onClick={() => switchRole('OPERATIONAL_MANAGER')}
-                className="bg-emerald-500/20 p-2 rounded-xl border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/30 transition-all shadow-lg group mr-1"
-                title="Switch to OPS Panel"
-                role="button"
-                aria-label="Switch to OPS Panel"
-              >
-                <BarChart2 className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition-transform" />
-              </div>
-            )}
-            <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-sm font-black leading-tight tracking-tight drop-shadow-sm">{activeUser.firstName} {activeUser.lastName}</span>
+          <div className="flex items-center gap-4 pl-6 border-l border-slate-800">
+            <div className="hidden sm:flex flex-col items-end">
+              <span className={`text-sm font-bold tracking-tight ${theme === 'light' ? 'text-slate-900' : 'text-white'}`}>{activeUser.firstName} {activeUser.lastName}</span>
               <button 
                 onClick={handleLogout}
-                className={`text-[10px] uppercase tracking-tighter font-black flex items-center gap-1 mt-0.5 ${
-                  activeUser.activeRole === 'WEBMASTER' ? 'text-red-400 hover:text-red-300' : 'text-white/60 hover:text-white'
-                }`}
+                className={`text-[10px] uppercase tracking-widest font-bold ${theme === 'light' ? 'text-slate-500 hover:text-red-500' : 'text-slate-500 hover:text-red-400'} transition-colors flex items-center gap-1.5 mt-0.5`}
               >
-                <LogOut className="w-2.5 h-2.5" />
-                Logout
+                <LogOut className="w-3 h-3" />
+                Sign Out
               </button>
             </div>
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black ring-2 ring-offset-2 transition-all ${
-              activeUser.activeRole === 'WEBMASTER' 
-                ? 'ring-orange-500 bg-gray-900 text-orange-500 ring-offset-black' 
-                : 'ring-white bg-white/20 text-white ring-offset-curro-blue'
-            }`}>
-              {activeUser.id.slice(0, 2)}
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white shadow-lg ${theme === 'light' ? 'shadow-indigo-500/20' : ''}`}>
+              {activeUser.firstName[0]}{activeUser.lastName[0]}
             </div>
           </div>
         </div>
       </nav>
 
-      <main className={`pt-28 px-4 md:px-8 mx-auto min-h-screen ${wideLayout ? 'max-w-none' : 'max-w-7xl'}`}>
+      <main className={`pt-32 pb-12 px-6 lg:px-8 mx-auto min-h-screen ${wideLayout ? 'max-w-none' : 'max-w-7xl'}`}>
         <Suspense fallback={<PanelLoadingSpinner />}>
           {activeUser.activeRole === 'TEACHER' && (
             <TeacherDashboard user={activeUser} teachers={teachers} />

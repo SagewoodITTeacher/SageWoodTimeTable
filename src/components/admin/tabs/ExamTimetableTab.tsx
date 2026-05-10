@@ -366,128 +366,139 @@ export function ExamTimetableTab({
 
   return (
     <div className="flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-      <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-        <div className="bg-curro-blue p-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-4 border-curro-red">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-              <CalendarRange className="w-6 h-6" />
+      <div className="bento-card border border-white/5 shadow-2xl relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.02] to-transparent pointer-events-none" />
+        <div className="bg-white/[0.02] p-8 text-white flex flex-col xl:flex-row xl:items-center justify-between gap-8 border-b border-white/5 relative z-10">
+          <div className="flex items-center gap-5">
+            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-500/20 border border-indigo-400/30">
+              <CalendarRange className="w-7 h-7" />
             </div>
             <div>
-              <h3 className="text-xl font-black leading-tight uppercase tracking-tight">
+              <h3 className="text-2xl font-black leading-tight uppercase tracking-tight">
                 Exam Time Table
               </h3>
-              <p className="text-white/70 text-[10px] font-black uppercase tracking-widest">
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">
                 Master Schedule Management
               </p>
             </div>
             <button
               onClick={onBackup}
-              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/20 shadow-lg"
+              className="flex items-center gap-2 px-6 py-2.5 bg-white/[0.03] hover:bg-white/10 text-slate-300 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-white/5 shadow-lg ml-2"
             >
-              <Download className="w-3.5 h-3.5" />
-              TimeTable JSON Backup
+              <Download className="w-4 h-4" />
+              Backup JSON
             </button>
           </div>
-          <div className="flex items-center gap-6">
+          
+          <div className="flex flex-wrap items-center gap-8">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">
-                Series Workload{" "}
-                <span className="text-[10px] opacity-60">({currentSeries})</span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">
+                Series <span className="opacity-50 font-medium">({currentSeries})</span>
               </span>
-              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl border border-white/10">
-                <BookOpen className="w-3.5 h-3.5 text-white/60" />
+              <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-950 border border-white/5 rounded-2xl shadow-inner">
+                <BookOpen className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-black text-white">
                   {seriesWorkload}{" "}
-                  <span className="text-[10px] opacity-60">MINS</span>
+                  <span className="text-[10px] text-slate-500 ml-1 uppercase">Mins</span>
                 </span>
               </div>
             </div>
 
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">
                 Invigilation Ratio
               </span>
-              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl border border-white/10">
-                <Repeat className="w-3.5 h-3.5 text-white/60" />
+              <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-950 border border-white/5 rounded-2xl shadow-inner">
+                <Repeat className="w-4 h-4 text-emerald-400" />
                 <span className="text-sm font-black text-white">
                   {invigilationRatio}{" "}
-                  <span className="text-[10px] opacity-60">X</span>
+                  <span className="text-[10px] text-slate-500 ml-1 uppercase">X</span>
                 </span>
               </div>
             </div>
 
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2">
                 Daily Workload
               </span>
-              <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl border border-white/10">
-                <Clock className="w-3.5 h-3.5 text-white/60" />
+              <div className="flex items-center gap-3 px-5 py-2.5 bg-slate-950 border border-white/5 rounded-2xl shadow-inner">
+                <Clock className="w-4 h-4 text-amber-400" />
                 <span className="text-sm font-black text-white">
                   {totalMinutes}{" "}
-                  <span className="text-[10px] opacity-60">MINS</span>
+                  <span className="text-[10px] text-slate-500 ml-1 uppercase">Mins</span>
                 </span>
               </div>
             </div>
+
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-white/60 uppercase tracking-widest mb-1">
-                Select Schedule Date
+              <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-2">
+                Active Date
               </span>
-              <div className="flex flex-col items-end gap-2">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-sm font-black focus:bg-white focus:text-curro-blue transition-all outline-none w-full"
-                />
+              <div className="flex flex-col items-end gap-3">
+                <div className="relative group/date min-w-[180px]">
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-slate-950 border border-white/5 group-hover/date:border-indigo-500/30 rounded-xl px-4 py-2.5 text-xs font-black text-white transition-all outline-none w-full shadow-2xl"
+                  />
+                  <div className="absolute inset-0 rounded-xl ring-2 ring-indigo-500/0 group-hover/date:ring-indigo-500/10 transition-all pointer-events-none" />
+                </div>
                 <button
                   onClick={toggleLock}
-                  className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                     isLocked
-                      ? "bg-amber-500 text-white shadow-lg"
-                      : "bg-white/20 text-white hover:bg-white/30"
+                      ? "bg-amber-600 text-white shadow-lg border border-amber-500/50"
+                      : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5"
                   }`}
                 >
                   {isLocked ? (
-                    <Lock className="w-3 h-3" />
+                    <Lock className="w-3.5 h-3.5" />
                   ) : (
-                    <LockOpen className="w-3 h-3" />
+                    <LockOpen className="w-3.5 h-3.5" />
                   )}
-                  {isLocked ? "Schedule Locked" : "Unlock Schedule"}
+                  {isLocked ? "Schedule Locked" : "Unlocked Mode"}
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="p-8">
-          <div className="grid grid-cols-1 gap-8">
+        <div className="p-8 relative z-10">
+          <div className="grid grid-cols-1 gap-12">
             {grades.map((grade) => (
               <div
                 key={grade}
-                className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6"
+                className="bg-white/[0.01] rounded-[2.5rem] border border-white/5 p-8 relative overflow-hidden"
               >
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-curro-blue text-white flex items-center justify-center font-black text-lg shadow-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.01] to-transparent pointer-events-none" />
+                <div className="flex items-center gap-5 mb-10 relative z-10">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-xl shadow-indigo-500/10 border border-indigo-400/30">
                     {grade}
                   </div>
-                  <h4 className="text-lg font-black text-text-dark uppercase tracking-tight">
-                    Grade {grade} Examination Status
-                  </h4>
+                  <div>
+                    <h4 className="text-xl font-black text-white uppercase tracking-tight">
+                      Grade {grade} Examination Status
+                    </h4>
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mt-1">
+                      Daily session control
+                    </p>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 relative z-10">
                   {renderSessionBlock(
                     grade,
                     "MORNING",
                     {
-                      headerText: "text-emerald-600",
-                      headerBg: "bg-emerald-50",
-                      btnBorder: "border-emerald-100",
-                      btnText: "text-emerald-600",
-                      btnHover: "hover:bg-emerald-50",
+                      headerText: "text-emerald-400",
+                      headerBg: "bg-emerald-500/10 border border-emerald-500/20",
+                      btnBorder: "border-emerald-500/20",
+                      btnText: "text-emerald-400",
+                      btnHover: "hover:bg-emerald-500/10",
                     },
                     "Morning Session",
-                    "Start: 08:20 (Arrive 07:50 / 07:30 Gr12)",
+                    "08:20 (Arrive 07:50 / 07:30 Gr12)",
                     "No morning exams planned",
                     "Add Morning Subject",
                   )}
@@ -495,14 +506,14 @@ export function ExamTimetableTab({
                     grade,
                     "AFTERNOON",
                     {
-                      headerText: "text-curro-red",
-                      headerBg: "bg-red-50",
-                      btnBorder: "border-red-100",
-                      btnText: "text-curro-red",
-                      btnHover: "hover:bg-red-50",
+                      headerText: "text-rose-400",
+                      headerBg: "bg-rose-500/10 border border-rose-500/20",
+                      btnBorder: "border-rose-500/20",
+                      btnText: "text-rose-400",
+                      btnHover: "hover:bg-rose-500/10",
                     },
                     "Afternoon Session",
-                    "Start: 13:20 (Arrive 12:50 / 12:30 Gr12)",
+                    "13:20 (Arrive 12:50 / 12:30 Gr12)",
                     "No afternoon exams planned",
                     "Add Afternoon Subject",
                   )}

@@ -2,199 +2,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 0. Global Safety Net - Default Deny
+    // 0. Global Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ===============================================================
-    // Global Helpers
-    // ===============================================================
-
+    // Helpers
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Roles are enforced server-side via the user's /users/{uid}.roles array.
-    // Anonymous auth is no longer permitted; sign-in is via Firebase Auth Google provider.
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'nortje.curro@gmail.com' ||
+        request.auth.uid == '69sU2DhbtLRNTULDKIawgLC1Om33' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         'ADMIN' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles)
+      );
     }
 
-    function userDoc() {
-      // Reads the caller's user profile. Returns null if the doc doesn't exist.
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function hasRole(role) {
-      return isSignedIn()
-          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-          && (role in userDoc().data.roles);
-    }
-
-    function isAdmin()              { return hasRole('ADMIN'); }
-    function isWebmaster()          { return hasRole('WEBMASTER'); }
-    function isOperationalManager() { return hasRole('OPERATIONAL_MANAGER'); }
-    function isApprover() {
-      return isSignedIn()
-          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-          && userDoc().data.canApproveExtensions == true;
-    }
-
-    function isAuthorized() {
-      // Legacy alias — anything calling this should migrate to a specific role.
-      // Kept narrow for now so existing call sites keep working.
-      return isSignedIn();
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    // ===============================================================
-    // Entity Rules
-    // ===============================================================
-
-    // 1. Users Collection
+    // 1. Users
     match /users/{userId} {
-      function isValidUser(data) {
-        // Core identifying fields
-        return data.id is string && data.firstName is string && data.lastName is string;
-      }
-
-      allow read: if isSignedIn();
-      allow create: if (isOwner(userId) || isAdmin()) && isValidUser(incoming());
-      allow update: if (isOwner(userId) || isAdmin()) && (
-        // For admin/owner, follow basic structure if present
-        (!incoming().keys().hasAll(['id']) || incoming().id is string) &&
-        // Prevent self-elevation of roles unless already an admin
-        (!incoming().diff(existing()).affectedKeys().hasAny(['roles', 'activeRole']) || isAdmin())
-      );
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
-    // 2. Venues Collection
-    match /venues/{venueId} {
-      function isValidVenue(data) {
-        return data.keys().hasAll(['id', 'name', 'type', 'capacity']) &&
-               data.id is string && data.id.size() > 0 && data.id.size() <= 32 &&
-               data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
-               data.type in ['Normal', 'Lab', 'Hall'] &&
-               data.capacity is int && data.capacity >= 0 && data.capacity <= 5000;
-      }
-
-      allow read: if isSignedIn(); // Restricted read: results must be filtered or checked
-      allow list: if isSignedIn(); // We allow listing if signed in
-      allow create: if isAdmin() && isValidId(venueId) && isValidVenue(incoming());
-      allow update: if isAdmin() && isValidVenue(incoming());
-      allow delete: if isAdmin();
-    }
-
-    // 3. Sessions Collection
-    match /sessions/{sessionId} {
+    // 2. Settings - USE RECURSIVE WILDCARD AT ROOT OF COLLECTION
+    match /settings/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // 4. Assignments Collection
-    match /assignments/{assignmentId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+    // 3. Other Collections
+    match /venues/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /sessions/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /assignments/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /leaveRequests/{id} { 
+      allow read: if isSignedIn(); 
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.teacherId == request.auth.uid);
     }
-
-    // 5. Leave Requests
-    match /leaveRequests/{requestId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && incoming().teacherId is string;
-      allow update, delete: if isAdmin() || (isSignedIn() && existing().teacherId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.id);
-    }
-
-    // 6. Timetable Entries
-    match /timetableEntries/{entryId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // 7. Marking Extensions
-    match /markingExtensions/{extId} {
-      function isValidExt(data) {
-        return data.keys().hasAll(['entryId', 'subject', 'grade', 'requestDate', 'reason', 'status', 'additionalGreenDays', 'requestedBy']) &&
-               data.entryId is string && data.subject is string && data.grade is int &&
-               data.requestDate is string && data.reason is string &&
-               data.status in ['PENDING', 'APPROVED', 'DENIED'] &&
-               data.additionalGreenDays is int && data.requestedBy is string;
-      }
-      
-      allow read: if isSignedIn();
-      allow create: if isOperationalManager() && isValidExt(incoming());
-      allow update: if (isApprover() || isAdmin()) && isValidExt(incoming());
-      allow delete: if isAdmin();
-    }
-    
-    // 8. Subjects Collection
-    match /subjects/{subjectId} {
-      function isValidSubject(data) {
-        return data.keys().hasAll(['code', 'name']) &&
-               data.code is string && data.code.size() > 0 &&
-               data.name is string && data.name.size() > 0;
-      }
-      
-      allow read: if isSignedIn();
-      allow create, update: if isAdmin() && isValidSubject(incoming());
-      allow delete: if isAdmin();
-    }
-    
-    // 9. Timetable Locks
-    match /timetableLocks/{date} {
-      function isValidLock(data) {
-        return data.keys().hasAll(['locked']) && 
-               data.locked is bool;
-      }
-      
-      allow read: if isSignedIn();
-      allow create: if isAdmin() && isValidId(date) && isValidLock(incoming()) && incoming().keys().size() == 1;
-      allow update: if isAdmin() && isValidLock(incoming()) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['locked']);
-    }
-
-    // 10. Day Period Configs
-    match /dayPeriodConfigs/{configId} {
-      function isValidPeriod(p) {
-        return p.id is string && p.label is string && 
-               p.start is string && p.end is string &&
-               p.break is bool;
-      }
-      function isValidDayConfig(data) {
-        return data.periods is list && data.periods.size() > 0;
-      }
-      
-      allow read: if isSignedIn();
-      allow write: if isAdmin() && isValidId(configId) && isValidDayConfig(incoming());
-    }
-
-    // 11. Help Requests
-    match /helpRequests/{requestId} {
-      function isValidHelpRequest(data) {
-        return data.keys().hasAll(['venueId', 'venueName', 'invigilatorId', 'invigilatorName', 'standbyId', 'option', 'status', 'createdAt', 'subject', 'grade']) &&
-               data.venueId is string && data.venueName is string &&
-               data.invigilatorId is string && data.invigilatorName is string &&
-               data.standbyId is string && data.option is string &&
-               data.status in ['PENDING', 'COMPLETED'];
-      }
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidHelpRequest(incoming());
-      allow update: if isSignedIn() && (
-        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && incoming().status == 'COMPLETED') ||
-        isAdmin()
-      );
-      allow delete: if isAdmin();
-    }
+    match /timetableEntries/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /markingExtensions/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /subjects/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /timetableLocks/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /dayPeriodConfigs/{id} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /helpRequests/{id} { allow read: if isSignedIn(); allow write: if isSignedIn(); }
   }
 }

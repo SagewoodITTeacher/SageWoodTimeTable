@@ -92,56 +92,56 @@ export const FacultyRow: React.FC<FacultyRowProps> = ({
 
   return (
     <div
-      className={`group p-3 px-4 transition-colors ${
+      className={`group p-4 px-6 transition-all border-l-4 ${
         hasPendingLeave
-          ? "bg-yellow-50 border-l-4 border-yellow-400 hover:bg-yellow-100/60"
+          ? "bg-amber-500/10 border-amber-500 hover:bg-amber-500/20"
           : isOps
-            ? "bg-purple-50/40 hover:bg-purple-50/70"
-            : "hover:bg-gray-50"
+            ? "bg-purple-500/10 border-purple-500/50 hover:bg-purple-500/20"
+            : "border-transparent hover:bg-white/[0.02]"
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-5">
         <div
-          className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center font-black text-sm transition-all ${
+          className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300 shadow-inner border border-white/5 ${
             isOps
-              ? "bg-purple-100 text-purple-700 ring-1 ring-purple-200"
-              : "bg-bg-gray text-curro-blue group-hover:bg-curro-blue group-hover:text-white"
+              ? "bg-purple-500/20 text-purple-300 ring-1 ring-purple-500/30"
+              : "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:scale-110"
           }`}
         >
           {t.lastName[0]}
         </div>
 
-        <div className="flex-1 min-w-0 flex flex-col gap-1">
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            <span className="text-sm font-black text-text-dark leading-tight truncate max-w-[260px]">
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className="flex items-center gap-3 min-w-0 flex-wrap">
+            <span className="text-sm font-bold text-slate-100 leading-tight truncate group-hover:text-white transition-colors">
               {t.firstName} {t.lastName}
             </span>
             {t.hasReward && (
-              <Gift className="w-3 h-3 text-amber-500 fill-amber-400 shrink-0" />
+              <Gift className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20 shrink-0" />
             )}
             {subjectCode && (
-              <span className="text-[10px] font-black text-curro-blue bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded uppercase tracking-tighter shrink-0">
+              <span className="text-[10px] font-black text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-lg uppercase tracking-widest shrink-0">
                 {subjectCode}
                 {subjectExtra ? ` ${subjectExtra}` : ""}
               </span>
             )}
             {currentTeachingGrade && (
-              <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter border border-emerald-100 shrink-0">
+              <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 shrink-0">
                 <Circle className="w-1.5 h-1.5 fill-current animate-pulse" />
-                Now Gr {currentTeachingGrade}
+                Live: Gr {currentTeachingGrade}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[10px] text-text-muted font-medium min-w-0 flex-wrap leading-none">
-            <span className="font-black uppercase tracking-tighter">
+          <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium min-w-0 flex-wrap leading-none">
+            <span className="font-black uppercase tracking-widest text-slate-400">
               {t.id}
             </span>
             {t.email && (
               <>
-                <span className="text-gray-300">·</span>
+                <span className="text-slate-800">·</span>
                 <span
-                  className="truncate max-w-[140px]"
+                  className="truncate max-w-[160px] hover:text-slate-300 transition-colors cursor-help"
                   title={t.email}
                 >
                   {t.email}
@@ -150,46 +150,46 @@ export const FacultyRow: React.FC<FacultyRowProps> = ({
             )}
             {t.homeRoomGrade && (
               <>
-                <span className="text-gray-300">·</span>
-                <span className="font-black uppercase tracking-tighter text-indigo-600">
-                  HR {t.homeRoomGrade}E{t.homeRoomClass}
+                <span className="text-slate-800">·</span>
+                <span className="font-black uppercase tracking-widest text-indigo-400">
+                  Nexus Gr {t.homeRoomGrade}E{t.homeRoomClass}
                 </span>
               </>
             )}
-            <span className="text-gray-300">·</span>
+            <span className="text-slate-800">·</span>
             <span
-              className={`font-black uppercase tracking-tighter ${isMarathon ? "text-orange-600" : isOps ? "text-purple-600" : "text-sky-600"}`}
+              className={`font-black uppercase tracking-widest ${isMarathon ? "text-amber-500" : isOps ? "text-purple-400" : "text-sky-400"}`}
             >
               {t.invigilationPreference || "SCATTERED"}
             </span>
             {(t.breakDutyDates?.length || 0) > 0 && (
               <>
-                <span className="text-gray-300">·</span>
-                <span className="font-black uppercase tracking-tighter text-rose-600 inline-flex items-center gap-0.5">
-                  <Coffee className="w-2.5 h-2.5" />
-                  BD {t.breakDutyDates?.length}
+                <span className="text-slate-800">·</span>
+                <span className="font-black uppercase tracking-widest text-rose-500 inline-flex items-center gap-1">
+                  <Coffee className="w-3 h-3" />
+                  {t.breakDutyDates?.length}
                 </span>
               </>
             )}
             {(t.afternoonDutyDates?.length || 0) > 0 && (
               <>
-                <span className="text-gray-300">·</span>
-                <span className="font-black uppercase tracking-tighter text-amber-600 inline-flex items-center gap-0.5">
-                  <Clock3 className="w-2.5 h-2.5" />
-                  AD {t.afternoonDutyDates?.length}
+                <span className="text-slate-800">·</span>
+                <span className="font-black uppercase tracking-widest text-amber-500 inline-flex items-center gap-1">
+                  <Clock3 className="w-3 h-3" />
+                  {t.afternoonDutyDates?.length}
                 </span>
               </>
             )}
-            <span className="text-gray-300">·</span>
+            <span className="text-slate-800">·</span>
             <span
-              className={`font-black uppercase tracking-tighter inline-flex items-center gap-0.5 ${hasHall ? "text-curro-blue" : "text-curro-red"}`}
+              className={`font-black uppercase tracking-widest inline-flex items-center gap-1 ${hasHall ? "text-indigo-400" : "text-rose-500"}`}
             >
               {hasHall ? (
-                <ShieldCheck className="w-2.5 h-2.5" />
+                <ShieldCheck className="w-3 h-3" />
               ) : (
-                <ShieldAlert className="w-2.5 h-2.5" />
+                <ShieldAlert className="w-3 h-3" />
               )}
-              {hasHall ? "Hall" : "Restricted"}
+              {hasHall ? "Nexus Access" : "Restricted"}
             </span>
           </div>
         </div>
@@ -201,7 +201,7 @@ export const FacultyRow: React.FC<FacultyRowProps> = ({
           onClick={onInspect}
         />
 
-        <div className="flex items-center gap-1 bg-gray-50 px-1.5 py-1 rounded border border-gray-100 shrink-0">
+        <div className="flex items-center gap-1 bg-slate-900 px-2 py-1.5 rounded-xl border border-white/5 shrink-0 hover:border-indigo-500/50 transition-colors group/input">
           <input
             type="number"
             value={t.workloadPercentage ?? 100}
@@ -210,117 +210,117 @@ export const FacultyRow: React.FC<FacultyRowProps> = ({
                 workloadPercentage: parseInt(e.target.value) || 0,
               })
             }
-            className="w-8 bg-transparent text-[10px] font-black text-curro-blue text-right focus:outline-none focus:ring-1 focus:ring-curro-blue rounded border-none p-0"
+            className="w-8 bg-transparent text-[10px] font-black text-indigo-400 text-right focus:outline-none focus:text-indigo-300 rounded border-none p-0"
             title="Workload weighting %"
           />
-          <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
             %
           </span>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={cyclePref}
-            className={`p-2 rounded-lg transition-all ${
+            className={`p-2.5 rounded-xl transition-all duration-300 border border-transparent shadow-lg ${
               isMarathon
-                ? "bg-orange-50 text-orange-600 hover:bg-orange-100"
+                ? "bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white hover:border-amber-400"
                 : isOps
-                  ? "bg-purple-50 text-purple-600 hover:bg-purple-100"
-                  : "bg-sky-50 text-sky-600 hover:bg-sky-100"
+                  ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500 hover:text-white hover:border-purple-400"
+                  : "bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white hover:border-indigo-400"
             }`}
             title={`Preference: ${t.invigilationPreference || "SCATTERED"} (click to cycle)`}
             aria-label="Cycle invigilation preference"
           >
             {isMarathon ? (
-              <Clock3 className="w-3.5 h-3.5" />
+              <Clock3 className="w-4 h-4" />
             ) : isOps ? (
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-4 h-4" />
             ) : (
-              <Zap className="w-3.5 h-3.5" />
+              <Zap className="w-4 h-4" />
             )}
           </button>
           <button
             onClick={onEdit}
-            className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+            className="p-2.5 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition-all shadow-lg"
             title="Edit profile"
             aria-label="Edit profile"
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
           </button>
           {wideMode ? (
-            <>
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => onUpdate(t.id, { hasReward: !t.hasReward })}
-                className={`p-2 rounded-lg transition-colors ${t.hasReward ? "bg-amber-50 text-amber-600 hover:bg-amber-100" : "hover:bg-amber-50 text-text-muted hover:text-amber-600"}`}
+                className={`p-2.5 rounded-xl transition-all border ${t.hasReward ? "bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-white" : "bg-slate-900 border-white/5 text-slate-500 hover:text-amber-500 hover:border-amber-500/50"}`}
                 title={t.hasReward ? "Disable reward" : "Enable reward"}
                 aria-label="Toggle reward"
               >
                 <Trophy
-                  className={`w-3.5 h-3.5 ${t.hasReward ? "fill-amber-400" : ""}`}
+                  className={`w-4 h-4 ${t.hasReward ? "fill-current" : ""}`}
                 />
               </button>
               <button
                 onClick={() => onUpdate(t.id, { hallPass: !hasHall })}
-                className={`p-2 rounded-lg transition-colors ${hasHall ? "bg-blue-50 text-curro-blue hover:bg-blue-100" : "bg-red-50 text-curro-red hover:bg-red-100"}`}
-                title={hasHall ? "Restrict hall pass" : "Grant hall pass"}
-                aria-label="Toggle hall pass"
+                className={`p-2.5 rounded-xl transition-all border ${hasHall ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500 hover:text-white" : "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500 hover:text-white"}`}
+                title={hasHall ? "Restrict hall access" : "Grant hall access"}
+                aria-label="Toggle hall access"
               >
                 {hasHall ? (
-                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <ShieldCheck className="w-4 h-4" />
                 ) : (
-                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <ShieldAlert className="w-4 h-4" />
                 )}
               </button>
               <button
                 onClick={onBreakDuty}
-                className={`p-2 rounded-lg transition-colors ${(t.breakDutyDates?.length || 0) > 0 ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "hover:bg-rose-50 text-text-muted hover:text-rose-600"}`}
+                className={`p-2.5 rounded-xl transition-all border ${(t.breakDutyDates?.length || 0) > 0 ? "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500 hover:text-white" : "bg-slate-900 border-white/5 text-slate-500 hover:text-rose-500 hover:border-rose-500/50"}`}
                 title="Break duty dates"
                 aria-label="Break duty dates"
               >
-                <Coffee className="w-3.5 h-3.5" />
+                <Coffee className="w-4 h-4" />
               </button>
               <button
                 onClick={onHomeRoom}
-                className={`p-2 rounded-lg transition-colors ${t.homeRoomGrade ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" : "hover:bg-indigo-50 text-text-muted hover:text-indigo-600"}`}
+                className={`p-2.5 rounded-xl transition-all border ${t.homeRoomGrade ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500 hover:text-white" : "bg-slate-900 border-white/5 text-slate-500 hover:text-indigo-500 hover:border-indigo-500/50"}`}
                 title="Home room class"
                 aria-label="Home room class"
               >
-                <Home className="w-3.5 h-3.5" />
+                <Home className="w-4 h-4" />
               </button>
               <button
                 onClick={onLeave}
-                className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+                className="p-2.5 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-500 hover:text-indigo-400 rounded-xl transition-all"
                 title="Schedule leave"
                 aria-label="Schedule leave"
               >
-                <CalendarOff className="w-3.5 h-3.5" />
+                <CalendarOff className="w-4 h-4" />
               </button>
               <button
                 onClick={onSubjects}
-                className="p-2 hover:bg-blue-50 text-text-muted hover:text-curro-blue rounded-lg transition-colors"
+                className="p-2.5 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-500 hover:text-indigo-400 rounded-xl transition-all"
                 title="Manage subjects"
                 aria-label="Manage subjects"
               >
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen className="w-4 h-4" />
               </button>
               <button
                 onClick={onTimetable}
-                className="p-2 hover:bg-red-50 text-text-muted hover:text-curro-red rounded-lg transition-colors"
+                className="p-2.5 bg-slate-900 border border-white/5 hover:bg-slate-800 text-slate-500 hover:text-rose-500 rounded-xl transition-all"
                 title="Edit timetable"
                 aria-label="Edit timetable"
               >
-                <Calendar className="w-3.5 h-3.5" />
+                <Calendar className="w-4 h-4" />
               </button>
-              <div className="w-px h-5 bg-gray-200 mx-0.5" />
+              <div className="w-[2px] h-6 bg-white/5 mx-1" />
               <button
                 onClick={onRemove}
-                className="p-2 hover:bg-red-50 text-text-muted hover:text-red-600 rounded-lg transition-colors"
-                title="Remove staff"
+                className="p-2.5 bg-slate-950 border border-rose-500/20 text-slate-600 hover:text-rose-500 hover:bg-rose-500/10 hover:border-rose-500 rounded-xl transition-all shadow-inner"
+                title="Decommission Staff"
                 aria-label="Remove staff"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
-            </>
+            </div>
           ) : (
             <OverflowMenu
               items={[
@@ -328,51 +328,51 @@ export const FacultyRow: React.FC<FacultyRowProps> = ({
                   label: t.hasReward ? "Disable reward" : "Enable reward",
                   icon: (
                     <Trophy
-                      className={`w-3.5 h-3.5 ${t.hasReward ? "text-amber-500 fill-amber-400" : ""}`}
+                      className={`w-4 h-4 ${t.hasReward ? "text-amber-500 fill-amber-400" : ""}`}
                     />
                   ),
                   onClick: () =>
                     onUpdate(t.id, { hasReward: !t.hasReward }),
                 },
                 {
-                  label: hasHall ? "Restrict hall pass" : "Grant hall pass",
+                  label: hasHall ? "Restrict hall access" : "Grant hall access",
                   icon: hasHall ? (
-                    <ShieldCheck className="w-3.5 h-3.5 text-curro-blue" />
+                    <ShieldCheck className="w-4 h-4 text-indigo-400" />
                   ) : (
-                    <ShieldAlert className="w-3.5 h-3.5 text-curro-red" />
+                    <ShieldAlert className="w-4 h-4 text-rose-500" />
                   ),
                   onClick: () =>
                     onUpdate(t.id, { hallPass: !hasHall }),
                 },
                 {
                   label: "Break duty dates",
-                  icon: <Coffee className="w-3.5 h-3.5" />,
+                  icon: <Coffee className="w-4 h-4" />,
                   onClick: onBreakDuty,
                 },
                 {
                   label: "Home room class",
-                  icon: <Home className="w-3.5 h-3.5" />,
+                  icon: <Home className="w-4 h-4" />,
                   onClick: onHomeRoom,
                 },
                 {
                   label: "Schedule leave",
-                  icon: <CalendarOff className="w-3.5 h-3.5" />,
+                  icon: <CalendarOff className="w-4 h-4" />,
                   onClick: onLeave,
                 },
                 {
                   label: "Manage subjects",
-                  icon: <BookOpen className="w-3.5 h-3.5" />,
+                  icon: <BookOpen className="w-4 h-4" />,
                   onClick: onSubjects,
                 },
                 {
                   label: "Edit timetable",
-                  icon: <Calendar className="w-3.5 h-3.5" />,
+                  icon: <Calendar className="w-4 h-4" />,
                   onClick: onTimetable,
                 },
               ]}
               danger={{
-                label: "Remove staff",
-                icon: <Trash2 className="w-3.5 h-3.5" />,
+                label: "Decommission Staff",
+                icon: <Trash2 className="w-4 h-4" />,
                 onClick: onRemove,
               }}
             />

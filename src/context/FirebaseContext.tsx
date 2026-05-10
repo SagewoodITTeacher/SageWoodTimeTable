@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, ReactNode } from 'react';
+import React, { useEffect, useState, useCallback, ReactNode, createContext, useContext, useMemo } from 'react';
 import { auth, googleProvider } from '../firebase';
 import {
   onAuthStateChanged,
@@ -11,7 +11,29 @@ import {
   createUserWithEmailAndPassword,
   type User,
 } from 'firebase/auth';
-import { FirebaseContext } from '../hooks/useFirebase';
+
+export interface FirebaseContextType {
+  user: User | null;
+  loading: boolean;
+  emailLinkPending: boolean;
+  emailLinkError: string | null;
+  login: () => Promise<void>;
+  sendEmailLink: (email: string) => Promise<void>;
+  confirmEmailLink: (email: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  createAccount: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+export const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
+
+export function useFirebase() {
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error('useFirebase must be used within a FirebaseProvider');
+  }
+  return context;
+}
 
 const EMAIL_FOR_SIGN_IN_KEY = 'curro:emailForSignIn';
 
@@ -65,6 +87,12 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
+      if (error instanceof Error && (error as any).code === 'auth/unauthorized-domain') {
+        const domain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+        throw new Error(
+          `Unauthorized Domain: Please add "${domain}" to your Firebase Console -> Authentication -> Settings -> Authorized Domains list.`
+        );
+      }
       throw error;
     }
   }, []);
@@ -102,21 +130,32 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const value = useMemo(() => ({
+    user,
+    loading,
+    emailLinkPending,
+    emailLinkError,
+    login,
+    sendEmailLink,
+    confirmEmailLink: completeWithEmail,
+    signInWithPassword,
+    createAccount,
+    logout,
+  }), [
+    user,
+    loading,
+    emailLinkPending,
+    emailLinkError,
+    login,
+    sendEmailLink,
+    completeWithEmail,
+    signInWithPassword,
+    createAccount,
+    logout
+  ]);
+
   return (
-    <FirebaseContext.Provider
-      value={{
-        user,
-        loading,
-        emailLinkPending,
-        emailLinkError,
-        login,
-        sendEmailLink,
-        confirmEmailLink: completeWithEmail,
-        signInWithPassword,
-        createAccount,
-        logout,
-      }}
-    >
+    <FirebaseContext.Provider value={value}>
       {children}
     </FirebaseContext.Provider>
   );

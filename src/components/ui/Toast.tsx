@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { CheckCircle2, Info, AlertTriangle, X } from "lucide-react";
 import { cn } from "./cn";
 
-export type ToastKind = "success" | "error" | "info";
+export type ToastKind = "success" | "error" | "info" | "warning";
 
 export interface ToastOptions {
   duration?: number;
@@ -31,6 +31,7 @@ interface ToastApi {
   success: (msg: string, opts?: ToastOptions) => void;
   error: (msg: string, opts?: ToastOptions) => void;
   info: (msg: string, opts?: ToastOptions) => void;
+  warning: (msg: string, opts?: ToastOptions) => void;
   dismiss: (id: number) => void;
 }
 
@@ -40,6 +41,7 @@ const DEFAULT_DURATION: Record<ToastKind, number> = {
   success: 4000,
   info: 4000,
   error: 6000,
+  warning: 5000,
 };
 
 const KIND_STYLES: Record<
@@ -58,6 +60,11 @@ const KIND_STYLES: Record<
   },
   error: {
     bg: "bg-curro-red text-white",
+    icon: <AlertTriangle className="w-5 h-5" />,
+    role: "alert",
+  },
+  warning: {
+    bg: "bg-amber-500 text-white",
     icon: <AlertTriangle className="w-5 h-5" />,
     role: "alert",
   },
@@ -101,6 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       success: (msg, opts) => push("success", msg, opts),
       error: (msg, opts) => push("error", msg, opts),
       info: (msg, opts) => push("info", msg, opts),
+      warning: (msg, opts) => push("warning", msg, opts),
       dismiss,
     }),
     [push, dismiss]

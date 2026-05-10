@@ -245,6 +245,10 @@
       "schema": "DayPeriodConfig",
       "description": "Custom period configurations for specific days or dates."
     },
+    "/settings/{settingId}": {
+      "schema": "object",
+      "description": "System and scheduler settings."
+    },
     "/helpRequests/{requestId}": {
       "schema": "HelpRequest",
       "description": "Real-time help requests from invigilators."

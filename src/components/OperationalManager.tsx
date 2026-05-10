@@ -282,7 +282,7 @@ export default function OperationalManager({ user, teachers }: Props) {
 
   return (
     <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <nav className="sticky top-28 z-40 bg-bg-gray/95 backdrop-blur-sm border-b border-gray-100 -mx-4 md:-mx-8 px-4 md:px-8 py-3 flex items-center gap-2 overflow-x-auto" aria-label="Operations sections">
+      <nav className="sticky top-28 z-40 bg-slate-900/80 backdrop-blur-md border border-slate-800 -mx-4 md:-mx-8 px-6 md:px-8 py-3 flex items-center gap-3 overflow-x-auto rounded-none lg:rounded-2xl lg:mx-0 shadow-2xl" aria-label="Operations sections">
         {[
           { id: 'incidents', label: 'Incidents', Icon: ShieldAlert },
           { id: 'leave', label: 'Leave', Icon: CalendarOff },
@@ -295,98 +295,102 @@ export default function OperationalManager({ user, teachers }: Props) {
           <a
             key={s.id}
             href={`#${s.id}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-text-muted hover:bg-gray-100 hover:text-text-dark transition-colors whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:bg-white/5 hover:text-white transition-all whitespace-nowrap border border-transparent hover:border-slate-700"
           >
-            <s.Icon className="w-3 h-3" />
+            <s.Icon className="w-3.5 h-3.5" />
             {s.label}
           </a>
         ))}
       </nav>
       {/* Incident Rapports Section */}
-      <SectionCard
-        id="incidents"
-        variant="red"
-        title="Incident Rapports"
-        subtitle="Real-time Invigilation Assistance Log"
-        icon={<ShieldAlert className="w-6 h-6" />}
-        headerActions={
-          <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+      <section id="incidents" className="bento-card p-0 overflow-hidden border-rose-500/10">
+        <div className="px-8 py-6 border-b border-slate-800 bg-gradient-to-r from-rose-600/10 to-transparent flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-rose-500/10 rounded-xl flex items-center justify-center">
+              <ShieldAlert className="w-6 h-6 text-rose-500" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest leading-none mb-1">Incident Rapports</h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Real-time Invigilation Assistance Log</p>
+            </div>
+          </div>
+          <div className="bg-rose-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/20">
             {helpRequests.filter(r => r.status === 'PENDING').length} PENDING
-          </span>
-        }
-      >
-        <div className="overflow-x-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-200">
+          </div>
+        </div>
+
+        <div className="overflow-x-auto max-h-[450px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-50">
-              <tr className="border-b border-gray-100">
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Time</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Subject</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Venue</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Invigilator</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Stand-By Teacher</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Request</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Confirmation</th>
+            <thead>
+              <tr className="border-b border-slate-800/50 bg-slate-900/40">
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Time</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Subject</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Venue</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Invigilator</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Stand-By</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Request</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-slate-800/30">
               {helpRequests.map((req) => {
                 const createdAt = req.createdAt?.toDate ? req.createdAt.toDate() : (req.createdAt ? new Date(req.createdAt) : new Date());
                 const standby = teachers.find(t => t.id === req.standbyId);
                 const standbyName = standby ? `${standby.firstName} ${standby.lastName}` : (req.standbyId || 'Unassigned');
 
                 return (
-                  <tr key={req.id} className={`hover:bg-gray-50/50 transition-colors ${req.status === 'PENDING' ? 'bg-red-50/30' : ''}`}>
-                    <td className="px-5 py-4">
-                      <span className="text-xs font-black text-gray-900">{format(createdAt, 'dd MMM yyyy')}</span>
+                  <tr key={req.id} className={`hover:bg-white/[0.02] transition-colors ${req.status === 'PENDING' ? 'bg-rose-500/5' : ''}`}>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-slate-300">{format(createdAt, 'dd MMM yyyy')}</span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-xs font-black text-gray-400 font-mono">{format(createdAt, 'HH:mm')}</span>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-slate-500 font-mono italic">{format(createdAt, 'HH:mm')}</span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-xs font-black text-gray-900">{req.subject}</span>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Grade {req.grade}</span>
+                        <span className="text-xs font-bold text-slate-200">{req.subject}</span>
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Grade {req.grade}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
-                      <span className="text-xs font-black text-text-dark uppercase">{req.venueName}</span>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-indigo-400 uppercase tracking-tighter">{req.venueName}</span>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-400 uppercase">
+                        <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase border border-slate-700">
                           {req.invigilatorName[0]}
                         </div>
-                        <span className="text-xs font-bold text-gray-700">{req.invigilatorName}</span>
+                        <span className="text-xs font-medium text-slate-400">{req.invigilatorName}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-black text-curro-blue uppercase">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400 uppercase border border-indigo-500/20">
                           {standbyName[0]}
                         </div>
-                        <span className="text-xs font-bold text-gray-700">{standbyName}</span>
+                        <span className="text-xs font-medium text-slate-400">{standbyName}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="text-xs font-black text-curro-red uppercase">{req.option}</span>
+                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">{req.option}</span>
                         {req.quantity && (
-                          <span className="text-[10px] font-black text-text-muted">Qty: {req.quantity}</span>
+                          <span className="text-[9px] font-bold text-slate-500">Qty: {req.quantity}</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-6 py-4">
                       <div className="flex justify-center">
                         {req.status === 'COMPLETED' ? (
-                          <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
-                             <CheckCircle2 className="w-3 h-3" />
-                             <span className="text-[10px] font-black uppercase tracking-tight">Yes</span>
+                          <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+                             <CheckCircle2 className="w-3.5 h-3.5" />
+                             <span className="text-[10px] font-bold uppercase tracking-tight">Confirmed</span>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 animate-pulse">
-                             <Clock className="w-3 h-3" />
-                             <span className="text-[10px] font-black uppercase tracking-tight">No</span>
+                          <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-500 rounded-lg border border-amber-500/20 animate-pulse">
+                             <Clock className="w-3.5 h-3.5" />
+                             <span className="text-[10px] font-bold uppercase tracking-tight">Active</span>
                           </div>
                         )}
                       </div>
@@ -394,47 +398,41 @@ export default function OperationalManager({ user, teachers }: Props) {
                   </tr>
                 );
               })}
-              {helpRequests.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-20 text-center">
-                    <div className="flex flex-col items-center opacity-20">
-                      <ShieldCheck className="w-12 h-12 mb-3" />
-                      <p className="text-xs font-black uppercase tracking-[0.2em]">All Systems Nominal</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </section>
 
       {/* Leave Section */}
-      <SectionCard
-        id="leave"
-        variant="blue"
-        title="Leave"
-        subtitle="Faculty Absence & Leave Records"
-        icon={<CalendarOff className="w-6 h-6" />}
-        headerActions={
-          <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+      <section id="leave" className="bento-card p-0 overflow-hidden border-indigo-500/10">
+        <div className="px-8 py-6 border-b border-slate-800 bg-gradient-to-r from-indigo-600/10 to-transparent flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center">
+              <CalendarOff className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-200 uppercase tracking-widest leading-none mb-1">Leave Registry</h3>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Faculty Absence & Leave Records</p>
+            </div>
+          </div>
+          <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20">
             {leaveRequests.filter(r => r.status === 'PENDING').length} PENDING
-          </span>
-        }
-      >
-        <div className="overflow-x-auto max-h-[350px] scrollbar-thin scrollbar-thumb-gray-200">
+          </div>
+        </div>
+
+        <div className="overflow-x-auto max-h-[450px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-gray-50">
-              <tr className="border-b border-gray-100">
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Full Day</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Times</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Invigilator</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reason</th>
-                <th className="px-5 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+            <thead>
+              <tr className="border-b border-slate-800/50 bg-slate-900/40">
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Full Day</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Window</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Faculty Member</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Motivation</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-slate-800/30">
               {[...leaveRequests]
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((req) => {
@@ -443,73 +441,65 @@ export default function OperationalManager({ user, teachers }: Props) {
                   const isToday = isSameDay(parseISO(req.date), new Date());
 
                   return (
-                    <tr key={req.id} className={`hover:bg-gray-50/50 transition-colors ${isToday ? 'bg-blue-50/40 ring-1 ring-inset ring-blue-200/50' : ''}`}>
-                      <td className="px-5 py-4">
-                        <span className={`text-xs font-black ${isToday ? 'text-blue-700' : 'text-gray-900'}`}>{format(parseISO(req.date), 'dd MMM yyyy')}</span>
-                        {isToday && <span className="ml-2 bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">Today</span>}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${req.isFullDay ? 'bg-purple-50 text-purple-600' : 'bg-gray-100 text-gray-400'}`}>
-                          {req.isFullDay ? 'Yes' : 'No'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        {req.isFullDay ? (
-                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Whole Day</span>
-                        ) : (
-                          <span className="text-xs font-black text-gray-700 font-mono italic">{req.startTime} - {req.endTime}</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
+                    <tr key={req.id} className={`hover:bg-white/[0.02] transition-colors ${isToday ? 'bg-indigo-500/5' : ''}`}>
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-black text-curro-blue uppercase">
-                            {teacherName[0]}
-                          </div>
-                          <span className="text-xs font-bold text-gray-700">{teacherName}</span>
+                          <span className={`text-xs font-bold ${isToday ? 'text-indigo-400' : 'text-slate-300'}`}>{format(parseISO(req.date), 'dd MMM yyyy')}</span>
+                          {isToday && <span className="bg-indigo-500 text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">Live</span>}
                         </div>
                       </td>
-                      <td className="px-5 py-4">
-                        <span className="text-xs text-gray-600 italic line-clamp-1 max-w-[200px]" title={req.reason}>
-                          {req.reason || 'No reason provided'}
+                      <td className="px-6 py-4">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border uppercase tracking-tighter ${req.isFullDay ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-slate-800 text-slate-500 border-slate-700'}`}>
+                          {req.isFullDay ? 'Full Day' : 'Partial'}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-4">
+                        {req.isFullDay ? (
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">All Sessions</span>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400 font-mono italic">{req.startTime} - {req.endTime}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-[10px] font-bold text-indigo-400 uppercase border border-indigo-500/20">
+                            {teacherName[0]}
+                          </div>
+                          <span className="text-xs font-medium text-slate-400">{teacherName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-[11px] text-slate-500 italic line-clamp-1 max-w-[200px]" title={req.reason}>
+                          {req.reason || 'No specific motivation provided'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="flex justify-center">
                           {req.status === 'APPROVED' ? (
-                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100">
-                               <CheckCircle2 className="w-3 h-3" />
-                               <span className="text-[10px] font-black uppercase tracking-tight">Approved</span>
+                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+                               <CheckCircle2 className="w-3.5 h-3.5" />
+                               <span className="text-[10px] font-bold uppercase tracking-tight">Approved</span>
                             </div>
                           ) : req.status === 'DENIED' ? (
-                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100">
-                               <XCircle className="w-3 h-3" />
-                               <span className="text-[10px] font-black uppercase tracking-tight">Denied</span>
+                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/20">
+                               <XCircle className="w-3.5 h-3.5" />
+                               <span className="text-[10px] font-bold uppercase tracking-tight">Rejected</span>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-100 animate-pulse">
-                               <Clock className="w-3 h-3" />
-                               <span className="text-[10px] font-black uppercase tracking-tight">Pending</span>
+                            <div className="flex items-center justify-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-500 rounded-lg border border-amber-500/20 animate-pulse">
+                               <Clock className="w-3.5 h-3.5" />
+                               <span className="text-[10px] font-bold uppercase tracking-tight">Pending</span>
                             </div>
                           )}
                         </div>
                       </td>
                     </tr>
-                  );
+                   );
                 })}
-              {leaveRequests.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-20 text-center">
-                    <div className="flex flex-col items-center opacity-20">
-                      <Calendar className="w-12 h-12 mb-3" />
-                      <p className="text-xs font-black uppercase tracking-[0.2em]">No Leave Records</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
-      </SectionCard>
+      </section>
 
       {/* Header Section */}
       <SectionCard
